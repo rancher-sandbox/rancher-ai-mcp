@@ -43,7 +43,7 @@ func TestGetNamespacedKubernetesResource(t *testing.T) {
 			}))
 			defer mockServer.Close()
 
-			result, _, err := GetNamespacedKubernetesResource(nil, &mcp.CallToolRequest{
+			result, _, err := GetResource(nil, &mcp.CallToolRequest{
 				Extra: &mcp.RequestExtra{
 					Header: map[string][]string{
 						"R_url": {mockServer.URL},
