@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"io"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -58,12 +61,29 @@ type GetKubernetesResourceParams struct {
 	Cluster   string `json:"cluster" jsonschema:"the cluster of the resource"`
 }
 
+type GetPodDetailsParams struct {
+	Name      string `json:"name" jsonschema:"the name of k8s resource"`
+	Namespace string `json:"namespace" jsonschema:"the namespace of the resource"`
+	Kind      string `json:"kind" jsonschema:"the kind of the resource"`
+	Cluster   string `json:"cluster" jsonschema:"the cluster of the resource"`
+}
+
+type GetNodeMetricsParams struct {
+	Cluster string `json:"cluster" jsonschema:"the cluster of the resource"`
+}
+
 type UpdateKubernetesResourceParams struct {
 	Name      string        `json:"name" jsonschema:"the name of k8s resource"`
 	Namespace string        `json:"namespace" jsonschema:"the namespace of the resource"`
 	Kind      string        `json:"kind" jsonschema:"the kind of the resource"`
 	Cluster   string        `json:"cluster" jsonschema:"the cluster of the resource"`
 	Patch     []interface{} `json:"patch" jsonschema:"the patch of the request"`
+}
+
+type ListKubernetesResourcesParams struct {
+	Namespace string `json:"namespace" jsonschema:"the namespace of the resource"`
+	Kind      string `json:"kind" jsonschema:"the kind of the resource"`
+	Cluster   string `json:"cluster" jsonschema:"the cluster of the resource"`
 }
 
 func GetResource(_ context.Context, toolReq *mcp.CallToolRequest, params GetKubernetesResourceParams) (*mcp.CallToolResult, any, error) {
@@ -80,12 +100,9 @@ func GetResource(_ context.Context, toolReq *mcp.CallToolRequest, params GetKube
 	}
 	reqUrl += "/" + params.Name
 
-	resp, statusCode, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
+	resp, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
 	if err != nil {
 		return nil, nil, err
-	}
-	if statusCode != http.StatusOK {
-		return nil, nil, errors.New(resp)
 	}
 	// TODO check if empty!
 	// TODO remove links too!
@@ -134,34 +151,17 @@ func UpdateKubernetesResource(ctx context.Context, toolReq *mcp.CallToolRequest,
 	}, nil, nil
 }
 
-func removeManagedFields(obj []byte) ([]byte, error) {
-	var result map[string]interface{}
-	err := json.Unmarshal(obj, &result)
-	if err != nil {
-		return nil, err
-	}
-	metadata, ok := result["metadata"].(map[string]interface{})
-	if !ok {
-		return nil, err
-	}
-	delete(metadata, "managedFields")
-	respWithoutManagedFields, err := json.Marshal(result)
-	if err != nil {
-		return nil, err
-	}
-
-	return respWithoutManagedFields, nil
-}
-
-/*
-func GetNamespacedKubernetesResourceList(_ context.Context, toolReq *mcp.CallToolRequest, params GetKubernetesResourceListParams) (*mcp.CallToolResult, any, error) {
+func ListKubernetesResources(_ context.Context, toolReq *mcp.CallToolRequest, params ListKubernetesResourcesParams) (*mcp.CallToolResult, any, error) {
 	rancherURL := toolReq.Extra.Header.Get(urlHeader)
 	kind := strings.ToLower(params.Kind)
-	var reqUrl string
-	if k8sKindsToGVRs[kind].Group == "" {
-		reqUrl = fmt.Sprintf("%s/%s/%s", rancherURL, steveEndpoint, kind)
+	reqUrl := rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint
+	if k8sKindsToGVRs[kind].Group != "" {
+		reqUrl += "/" + k8sKindsToGVRs[kind].Group + "." + kind
 	} else {
-		reqUrl = fmt.Sprintf("%s/%s/%s.%s", rancherURL, steveEndpoint, k8sKindsToGVRs[kind].Group, kind)
+		reqUrl += "/" + kind
+	}
+	if params.Namespace != "" {
+		reqUrl += "/" + params.Namespace
 	}
 	resp, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
 	if err != nil {
@@ -171,26 +171,138 @@ func GetNamespacedKubernetesResourceList(_ context.Context, toolReq *mcp.CallToo
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: resp}},
 	}, nil, nil
-}*/
+}
 
-func doRequest(url string, token string) (string, int, error) {
+func GetPodDetails(_ context.Context, toolReq *mcp.CallToolRequest, params GetPodDetailsParams) (*mcp.CallToolResult, any, error) {
+	rancherURL := toolReq.Extra.Header.Get(urlHeader)
+	reqUrl := rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint + "/pods/" + params.Namespace + "/" + params.Name
+	podResp, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
+	if err != nil {
+		return nil, nil, err
+	}
+	var pod corev1.Pod
+	if err := json.Unmarshal([]byte(podResp), &pod); err != nil {
+		return nil, nil, fmt.Errorf("error parsing pod response : %w", err)
+	}
+	var replicaSetName string
+	for _, or := range pod.OwnerReferences {
+		if or.Kind == "ReplicaSet" {
+			replicaSetName = or.Name
+			break
+		}
+	}
+	reqUrl = rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint + "/apps.replicasets/" + params.Namespace + "/" + replicaSetName
+	replicaSetResp, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
+	if err != nil {
+		return nil, nil, err
+	}
+	var replicaSet appsv1.ReplicaSet
+	if err := json.Unmarshal([]byte(replicaSetResp), &replicaSet); err != nil {
+		return nil, nil, fmt.Errorf("error parsing replicaset response : %w", err)
+	}
+	// TODO check for replicaset or demonset
+	var deploymentName string
+	for _, or := range replicaSet.OwnerReferences {
+		if or.Kind == "Deployment" {
+			deploymentName = or.Name
+			break
+		}
+	}
+	reqUrl = rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint + "/apps.deployments/" + params.Namespace + "/" + deploymentName
+	deploymentResp, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	reqUrl = rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint + "/metrics.k8s.io.pods/" + params.Namespace + "/" + params.Name
+	metricResp, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// TODO check if empty!
+	// TODO remove links too!
+	podWithoutManagedFields, err := removeManagedFields([]byte(podResp))
+	if err != nil {
+		return nil, nil, err
+	}
+	deploymentWithoutManagedFields, err := removeManagedFields([]byte(deploymentResp))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: string(podWithoutManagedFields) + string(deploymentWithoutManagedFields) + metricResp}},
+	}, nil, nil
+}
+
+func GetDeploymentDetails(_ context.Context, toolReq *mcp.CallToolRequest, params GetPodDetailsParams) (*mcp.CallToolResult, any, error) {
+	rancherURL := toolReq.Extra.Header.Get(urlHeader)
+	reqUrl := rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint + "/apps.deployments/" + params.Namespace + "/" + params.Name
+	deploymentResp, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
+	if err != nil {
+		return nil, nil, err
+	}
+	var deployment appsv1.Deployment
+	if err := json.Unmarshal([]byte(deploymentResp), &deployment); err != nil {
+		return nil, nil, fmt.Errorf("error parsing pod response : %w", err)
+	}
+
+	filter := ""
+	for k, v := range deployment.Spec.Selector.MatchLabels {
+		filter = filter + "filter=metadata.labels." + k + "=" + v + "&"
+	}
+	filter = filter[:len(filter)-1]
+	reqUrl = rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint + "/pods/" + params.Namespace + "?" + filter
+	podResp, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
+	if err != nil {
+		return nil, nil, err
+	}
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: deploymentResp + podResp}},
+	}, nil, nil
+}
+
+func GetNodeMetrics(_ context.Context, toolReq *mcp.CallToolRequest, params GetNodeMetricsParams) (*mcp.CallToolResult, any, error) {
+	rancherURL := toolReq.Extra.Header.Get(urlHeader)
+	reqUrl := rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint + "/nodes"
+	nodeResp, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
+	if err != nil {
+		return nil, nil, err
+	}
+	reqUrl = rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint + "/metrics.k8s.io.nodes"
+	metricsResp, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: nodeResp + metricsResp}},
+	}, nil, nil
+
+}
+
+func doRequest(url string, token string) (string, error) {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		return "", 0, err
+		return "", err
 	}
 	req.Header.Set("Cookie", "R_SESS="+token)
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", 0, err
+		return "", err
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", 0, err
+		return "", err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", errors.New(string(body))
 	}
 
-	return string(body), resp.StatusCode, nil
+	return string(body), nil
 }
 
 func createDynamicClient(token string, url string) (*dynamic.DynamicClient, error) {
@@ -221,4 +333,23 @@ func createDynamicClient(token string, url string) (*dynamic.DynamicClient, erro
 	}
 
 	return dynClient, nil
+}
+
+func removeManagedFields(obj []byte) ([]byte, error) {
+	var result map[string]interface{}
+	err := json.Unmarshal(obj, &result)
+	if err != nil {
+		return nil, err
+	}
+	metadata, ok := result["metadata"].(map[string]interface{})
+	if !ok {
+		return nil, err
+	}
+	delete(metadata, "managedFields")
+	respWithoutManagedFields, err := json.Marshal(result)
+	if err != nil {
+		return nil, err
+	}
+
+	return respWithoutManagedFields, nil
 }
