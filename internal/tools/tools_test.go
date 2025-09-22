@@ -8,6 +8,11 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/fake"
 )
 
 func TestGetKubernetesResource(t *testing.T) {
@@ -51,11 +56,109 @@ func TestGetKubernetesResource(t *testing.T) {
 				w.Write([]byte(test.mockResponse))
 			}))
 			defer mockServer.Close()
+			tools := &Tools{}
 
-			result, _, err := GetResource(nil, &mcp.CallToolRequest{
+			result, _, err := tools.GetResource(nil, &mcp.CallToolRequest{
 				Extra: &mcp.RequestExtra{
 					Header: map[string][]string{
 						"R_url": {mockServer.URL},
+					},
+				},
+			}, test.params)
+
+			if test.expectedError != "" {
+				assert.ErrorContains(t, err, test.expectedError)
+			} else {
+				assert.NoError(t, err)
+				assert.JSONEq(t, test.expectedResult, result.Content[0].(*mcp.TextContent).Text)
+			}
+		})
+	}
+}
+
+func TestUpdateKubernetesResource(t *testing.T) {
+	tests := map[string]struct {
+		params         UpdateKubernetesResourceParams
+		obj            runtime.Object
+		expectedError  string
+		expectedResult string
+	}{
+		"update pod": {
+			params: UpdateKubernetesResourceParams{
+				Name:      "pod-1",
+				Namespace: "dev",
+				Kind:      "pod",
+				Cluster:   "local",
+				Patch: []interface{}{
+					map[string]interface{}{
+						"op":    "replace",
+						"path":  "/spec/containers/0/image",
+						"value": "rancher:2",
+					},
+				},
+			},
+			obj: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "dev",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "rancher-container",
+							Image: "rancher:1",
+						},
+					},
+				},
+			},
+			expectedResult: `{"apiVersion":"v1","kind":"Pod","metadata":{"name":"pod-1","namespace":"dev"},"spec":{"containers":[{"image":"rancher:2","name":"rancher-container","resources":{}}]},"status":{}}`,
+		},
+		"invalid patch": {
+			params: UpdateKubernetesResourceParams{
+				Name:      "pod-1",
+				Namespace: "dev",
+				Kind:      "pod",
+				Cluster:   "local",
+				Patch: []interface{}{
+					map[string]interface{}{
+						"op":    "invalid",
+						"path":  "/spec/invalid",
+						"value": "rancher:2",
+					},
+				},
+			},
+			obj: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pod-1",
+					Namespace: "dev",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "rancher-container",
+							Image: "rancher:1",
+						},
+					},
+				},
+			},
+			expectedError: "failed to update resource pod-1 in namespace dev: Unexpected kind: invalid",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			fakeClient := createFakeDynamicClient(test.obj)
+			tools := &Tools{
+				createDynamicClientFunc: func(token string, url string) (dynamic.Interface, error) {
+					return fakeClient, nil
+				},
+			}
+			result, _, err := tools.UpdateKubernetesResource(nil, &mcp.CallToolRequest{
+				Extra: &mcp.RequestExtra{
+					Header: map[string][]string{
+						"R_url":   {"https://localhost:8080"},
+						"R_token": {"token-xxxx"},
 					},
 				},
 			}, test.params)
@@ -104,8 +207,9 @@ func TestListKubernetesResource(t *testing.T) {
 				w.Write([]byte(test.mockResponse))
 			}))
 			defer mockServer.Close()
+			tools := &Tools{}
 
-			result, _, err := ListKubernetesResources(nil, &mcp.CallToolRequest{
+			result, _, err := tools.ListKubernetesResources(nil, &mcp.CallToolRequest{
 				Extra: &mcp.RequestExtra{
 					Header: map[string][]string{
 						"R_url": {mockServer.URL},
@@ -148,6 +252,7 @@ func TestGetNodes(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
+			tools := &Tools{}
 			mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
 				case test.expectedNodesPath:
@@ -162,7 +267,7 @@ func TestGetNodes(t *testing.T) {
 			}))
 			defer mockServer.Close()
 
-			result, _, err := GetNodes(nil, &mcp.CallToolRequest{
+			result, _, err := tools.GetNodes(nil, &mcp.CallToolRequest{
 				Extra: &mcp.RequestExtra{
 					Header: map[string][]string{
 						"R_url": {mockServer.URL},
@@ -178,4 +283,13 @@ func TestGetNodes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func createFakeDynamicClient(objects ...runtime.Object) *fake.FakeDynamicClient {
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+
+	dynClient := fake.NewSimpleDynamicClient(scheme, objects...)
+
+	return dynClient
 }

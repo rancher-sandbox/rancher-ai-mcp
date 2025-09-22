@@ -10,6 +10,7 @@ import (
 
 func main() {
 	server := mcp.NewServer(&mcp.Implementation{Name: "pod finder", Version: "v1.0.0"}, nil)
+	tools := tools.NewTools()
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "getKubernetesResource",
 		Description: `Fetches a Kubernetes resource from the cluster. Use this tool to retrieve the YAML or JSON representation of any Kubernetes object.

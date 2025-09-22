@@ -93,7 +93,17 @@ type ListKubernetesResourcesParams struct {
 	Cluster   string `json:"cluster" jsonschema:"the cluster of the resource"`
 }
 
-func GetResource(_ context.Context, toolReq *mcp.CallToolRequest, params GetKubernetesResourceParams) (*mcp.CallToolResult, any, error) {
+type Tools struct {
+	createDynamicClientFunc func(token string, url string) (dynamic.Interface, error)
+}
+
+func NewTools() *Tools {
+	return &Tools{
+		createDynamicClientFunc: createDynamicClient,
+	}
+}
+
+func (t *Tools) GetResource(_ context.Context, toolReq *mcp.CallToolRequest, params GetKubernetesResourceParams) (*mcp.CallToolResult, any, error) {
 	rancherURL := toolReq.Extra.Header.Get(urlHeader)
 	kind := strings.ToLower(params.Kind)
 	reqUrl := rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint
@@ -116,10 +126,10 @@ func GetResource(_ context.Context, toolReq *mcp.CallToolRequest, params GetKube
 	}, nil, nil
 }
 
-func UpdateKubernetesResource(ctx context.Context, toolReq *mcp.CallToolRequest, params UpdateKubernetesResourceParams) (*mcp.CallToolResult, any, error) {
+func (t *Tools) UpdateKubernetesResource(ctx context.Context, toolReq *mcp.CallToolRequest, params UpdateKubernetesResourceParams) (*mcp.CallToolResult, any, error) {
 	rancherURL := toolReq.Extra.Header.Get(urlHeader)
 	clusterURL := rancherURL + "/k8s/clusters/" + params.Cluster
-	dynClient, err := createDynamicClient(toolReq.Extra.Header.Get(tokenHeader), clusterURL)
+	dynClient, err := t.createDynamicClientFunc(toolReq.Extra.Header.Get(tokenHeader), clusterURL)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create dynamic client: %w", err)
 	}
@@ -135,7 +145,7 @@ func UpdateKubernetesResource(ctx context.Context, toolReq *mcp.CallToolRequest,
 		obj, err = dynClient.Resource(k8sKindsToGVRs[kind]).Patch(ctx, params.Name, types.JSONPatchType, patchBytes, metav1.PatchOptions{})
 	}
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to update resouce %s in namesapce %s: %w", params.Name, params.Namespace, err)
+		return nil, nil, fmt.Errorf("failed to update resource %s in namespace %s: %w", params.Name, params.Namespace, err)
 	}
 	objBytes, err := json.Marshal(obj)
 	if err != nil {
@@ -151,7 +161,7 @@ func UpdateKubernetesResource(ctx context.Context, toolReq *mcp.CallToolRequest,
 	}, nil, nil
 }
 
-func ListKubernetesResources(_ context.Context, toolReq *mcp.CallToolRequest, params ListKubernetesResourcesParams) (*mcp.CallToolResult, any, error) {
+func (t *Tools) ListKubernetesResources(_ context.Context, toolReq *mcp.CallToolRequest, params ListKubernetesResourcesParams) (*mcp.CallToolResult, any, error) {
 	rancherURL := toolReq.Extra.Header.Get(urlHeader)
 	kind := strings.ToLower(params.Kind)
 	reqUrl := rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint
@@ -173,7 +183,7 @@ func ListKubernetesResources(_ context.Context, toolReq *mcp.CallToolRequest, pa
 	}, nil, nil
 }
 
-func GetPodDetails(_ context.Context, toolReq *mcp.CallToolRequest, params GetPodDetailsParams) (*mcp.CallToolResult, any, error) {
+func (t *Tools) GetPodDetails(_ context.Context, toolReq *mcp.CallToolRequest, params GetPodDetailsParams) (*mcp.CallToolResult, any, error) {
 	rancherURL := toolReq.Extra.Header.Get(urlHeader)
 	reqUrl := rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint + "/pods/" + params.Namespace + "/" + params.Name
 	podResp, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
@@ -225,7 +235,7 @@ func GetPodDetails(_ context.Context, toolReq *mcp.CallToolRequest, params GetPo
 	}, nil, nil
 }
 
-func GetDeploymentDetails(_ context.Context, toolReq *mcp.CallToolRequest, params GetPodDetailsParams) (*mcp.CallToolResult, any, error) {
+func (t *Tools) GetDeploymentDetails(_ context.Context, toolReq *mcp.CallToolRequest, params GetPodDetailsParams) (*mcp.CallToolResult, any, error) {
 	rancherURL := toolReq.Extra.Header.Get(urlHeader)
 	reqUrl := rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint + "/apps.deployments/" + params.Namespace + "/" + params.Name
 	deploymentResp, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
@@ -251,7 +261,7 @@ func GetDeploymentDetails(_ context.Context, toolReq *mcp.CallToolRequest, param
 	}, nil, nil
 }
 
-func GetNodes(_ context.Context, toolReq *mcp.CallToolRequest, params GetNodesParams) (*mcp.CallToolResult, any, error) {
+func (t *Tools) GetNodes(_ context.Context, toolReq *mcp.CallToolRequest, params GetNodesParams) (*mcp.CallToolResult, any, error) {
 	rancherURL := toolReq.Extra.Header.Get(urlHeader)
 	reqUrl := rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint + "/nodes"
 	nodeResp, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
@@ -298,7 +308,7 @@ func doRequest(url string, token string) (string, error) {
 	return string(respWithoutManagedFields), nil
 }
 
-func createDynamicClient(token string, url string) (*dynamic.DynamicClient, error) {
+func createDynamicClient(token string, url string) (dynamic.Interface, error) {
 	kubeconfig := clientcmdapi.NewConfig()
 	kubeconfig.Clusters["cluster"] = &clientcmdapi.Cluster{
 		Server: url,
