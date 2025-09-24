@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -17,8 +18,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -76,6 +80,14 @@ type GetNodesParams struct {
 	Cluster string `json:"cluster" jsonschema:"the cluster of the resource"`
 }
 
+// GetPodLogsParams specifies the parameters needed to retrieve logs from a specific pod.
+type GetPodLogsParams struct {
+	Name      string `json:"name" jsonschema:"the name of k8s resource"`
+	Namespace string `json:"namespace" jsonschema:"the namespace of the resource"`
+	Cluster   string `json:"cluster" jsonschema:"the cluster of the resource"`
+	Container string `json:"container" jsonschema:"the container of the pod"`
+}
+
 // UpdateKubernetesResourceParams defines the structure for updating a general Kubernetes resource.
 // It includes fields required to uniquely identify a resource within a cluster.
 type UpdateKubernetesResourceParams struct {
@@ -84,6 +96,15 @@ type UpdateKubernetesResourceParams struct {
 	Kind      string        `json:"kind" jsonschema:"the kind of the resource"`
 	Cluster   string        `json:"cluster" jsonschema:"the cluster of the resource"`
 	Patch     []interface{} `json:"patch" jsonschema:"the patch of the request"`
+}
+
+// CreateKubernetesResourceParams defines the structure for creating a general Kubernetes resource.
+type CreateKubernetesResourceParams struct {
+	Name      string `json:"name" jsonschema:"the name of k8s resource"`
+	Namespace string `json:"namespace" jsonschema:"the namespace of the resource"`
+	Kind      string `json:"kind" jsonschema:"the kind of the resource"`
+	Cluster   string `json:"cluster" jsonschema:"the cluster of the resource"`
+	Resource  any    `json:"patch" jsonschema:"the patch of the request"`
 }
 
 // ListKubernetesResourcesParams specifies the parameters needed to list kubernetes resources.
@@ -95,11 +116,13 @@ type ListKubernetesResourcesParams struct {
 
 type Tools struct {
 	createDynamicClientFunc func(token string, url string) (dynamic.Interface, error)
+	createClientSetFunc     func(token string, url string) (kubernetes.Interface, error)
 }
 
 func NewTools() *Tools {
 	return &Tools{
 		createDynamicClientFunc: createDynamicClient,
+		createClientSetFunc:     createClientSet,
 	}
 }
 
@@ -148,6 +171,46 @@ func (t *Tools) UpdateKubernetesResource(ctx context.Context, toolReq *mcp.CallT
 		return nil, nil, fmt.Errorf("failed to update resource %s in namespace %s: %w", params.Name, params.Namespace, err)
 	}
 	objBytes, err := json.Marshal(obj)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal response: %w", err)
+	}
+	respWithoutManagedFields, err := removeManagedFieldsIfPresent(objBytes)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to remove managedFields: %w", err)
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: string(respWithoutManagedFields)}},
+	}, nil, nil
+}
+
+func (t *Tools) CreateKubernetesResource(ctx context.Context, toolReq *mcp.CallToolRequest, params CreateKubernetesResourceParams) (*mcp.CallToolResult, any, error) {
+	rancherURL := toolReq.Extra.Header.Get(urlHeader)
+	clusterURL := rancherURL + "/k8s/clusters/" + params.Cluster
+	dynClient, err := t.createDynamicClientFunc(toolReq.Extra.Header.Get(tokenHeader), clusterURL)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create dynamic client: %w", err)
+	}
+	objBytes, err := json.Marshal(params.Resource)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create patch: %w", err)
+	}
+	unstructuredObj := &unstructured.Unstructured{}
+	err = json.Unmarshal(objBytes, unstructuredObj)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create unstructure object: %w", err)
+	}
+	var obj *unstructured.Unstructured
+	kind := strings.ToLower(params.Kind)
+	if params.Namespace != "" {
+		obj, err = dynClient.Resource(k8sKindsToGVRs[kind]).Namespace(params.Namespace).Create(ctx, unstructuredObj, metav1.CreateOptions{})
+	} else {
+		obj, err = dynClient.Resource(k8sKindsToGVRs[kind]).Create(ctx, unstructuredObj, metav1.CreateOptions{})
+	}
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to update resource %s in namespace %s: %w", params.Name, params.Namespace, err)
+	}
+	objBytes, err = json.Marshal(obj)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to marshal response: %w", err)
 	}
@@ -277,7 +340,35 @@ func (t *Tools) GetNodes(_ context.Context, toolReq *mcp.CallToolRequest, params
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: nodeResp + metricsResp}},
 	}, nil, nil
+}
 
+func (t *Tools) GetPodLogs(ctx context.Context, toolReq *mcp.CallToolRequest, params GetPodLogsParams) (*mcp.CallToolResult, any, error) {
+	rancherURL := toolReq.Extra.Header.Get(urlHeader)
+	clusterURL := rancherURL + "/k8s/clusters/" + params.Cluster
+	clientset, err := t.createClientSetFunc(toolReq.Extra.Header.Get(tokenHeader), clusterURL)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create clientset: %w", err)
+	}
+	podLogOptions := corev1.PodLogOptions{
+		TailLines: ptr.To[int64](50),
+		Container: params.Container,
+	}
+
+	req := clientset.CoreV1().Pods(params.Namespace).GetLogs(params.Name, &podLogOptions)
+	podLogs, err := req.Stream(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to open log stream: %v", err)
+	}
+	defer podLogs.Close()
+	buf := new(bytes.Buffer)
+	_, err = io.Copy(buf, podLogs)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to copy log stream to buffer: %v", err)
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: buf.String()}},
+	}, nil, nil
 }
 
 func doRequest(url string, token string) (string, error) {
@@ -308,7 +399,7 @@ func doRequest(url string, token string) (string, error) {
 	return string(respWithoutManagedFields), nil
 }
 
-func createDynamicClient(token string, url string) (dynamic.Interface, error) {
+func createRestConfig(token string, url string) (*rest.Config, error) {
 	kubeconfig := clientcmdapi.NewConfig()
 	kubeconfig.Clusters["cluster"] = &clientcmdapi.Cluster{
 		Server: url,
@@ -327,6 +418,24 @@ func createDynamicClient(token string, url string) (dynamic.Interface, error) {
 		&clientcmd.ConfigOverrides{},
 		nil,
 	).ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	return restConfig, nil
+}
+
+func createClientSet(token string, url string) (kubernetes.Interface, error) {
+	restConfig, err := createRestConfig(token, url)
+	if err != nil {
+		return nil, err
+	}
+
+	return kubernetes.NewForConfig(restConfig)
+}
+
+func createDynamicClient(token string, url string) (dynamic.Interface, error) {
+	restConfig, err := createRestConfig(token, url)
 	if err != nil {
 		return nil, err
 	}

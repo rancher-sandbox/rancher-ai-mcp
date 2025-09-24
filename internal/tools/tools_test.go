@@ -1,6 +1,8 @@
 package tools
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -12,7 +14,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/dynamic/fake"
+	fakedyn "k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestGetKubernetesResource(t *testing.T) {
@@ -285,11 +289,79 @@ func TestGetNodes(t *testing.T) {
 	}
 }
 
-func createFakeDynamicClient(objects ...runtime.Object) *fake.FakeDynamicClient {
+func TestGetPodLogs(t *testing.T) {
+	fakeLogs := "fake logs" // this is hardcoded in the fake client. see fake_pod_expansion.go
+
+	tests := map[string]struct {
+		params         GetPodLogsParams
+		mockClient     func(token string, url string) (kubernetes.Interface, error)
+		expectedError  string
+		expectedResult string
+	}{
+		"get logs": {
+			params: GetPodLogsParams{
+				Name:      "pod-1",
+				Namespace: "dev",
+				Cluster:   "local",
+			},
+			mockClient: func(token string, url string) (kubernetes.Interface, error) {
+				pod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "pod-1",
+						Namespace: "dev",
+					},
+				}
+
+				return fake.NewClientset(pod), nil
+			},
+			expectedResult: fakeLogs,
+		},
+		"error creating client": {
+			params: GetPodLogsParams{
+				Name:      "pod-1",
+				Namespace: "dev",
+				Cluster:   "local",
+			},
+			mockClient: func(token string, url string) (kubernetes.Interface, error) {
+				return nil, errors.New("fake error")
+			},
+			expectedError: "failed to create clientset: fake error",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			tools := &Tools{
+				createClientSetFunc: test.mockClient,
+			}
+			result, _, err := tools.GetPodLogs(context.TODO(), &mcp.CallToolRequest{
+				Extra: &mcp.RequestExtra{
+					Header: map[string][]string{
+						"R_url":   {"https://localhost:8080"},
+						"R_token": {"token-xxxx"},
+					},
+				},
+			}, test.params)
+
+			if test.expectedError != "" {
+				assert.ErrorContains(t, err, test.expectedError)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, test.expectedResult, result.Content[0].(*mcp.TextContent).Text)
+			}
+		})
+	}
+}
+
+// TODO testCreateResource
+// TODO add human validation for create
+
+func createFakeDynamicClient(objects ...runtime.Object) *fakedyn.FakeDynamicClient {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
 
-	dynClient := fake.NewSimpleDynamicClient(scheme, objects...)
+	dynClient := fakedyn.NewSimpleDynamicClient(scheme, objects...)
 
 	return dynClient
 }

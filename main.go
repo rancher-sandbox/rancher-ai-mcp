@@ -74,6 +74,25 @@ name (string): The name of the Deployment.`},
 Parameters:
 cluster (string): The name of the Kubernetes cluster.`},
 		tools.GetNodes)
+	/*	mcp.AddTool(server, &mcp.Tool{
+				Name: "createKubernetesResource",
+				Description: `Returns a list of all nodes in a specified Kubernetes cluster, including their current resource utilization metrics.'
+		Parameters:
+		kind (string): The type of Kubernetes resource to patch (e.g., Pod, Deployment, Service).
+		namespace (string): The namespace where the resource is located. It must be empty for cluster-wide resources.
+		name (string): The name of the specific resource to patch.
+		cluster (string): The name of the Kubernetes cluster. Empty for single container pods.
+		resource (json): Resource to be created. This must be a JSON object.`},
+				tools.CreateKubernetesResource)*/
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "getPodLogs",
+		Description: `Returns logs from a pod.'
+Parameters:
+namespace (string): The namespace where the pod is located.
+name (string): The name of the pod.
+container (string, optional): The name of the container. Leave empty if not specified.
+cluster (string): The name of the Kubernetes cluster.`},
+		tools.GetPodLogs)
 
 	handler := mcp.NewStreamableHTTPHandler(func(request *http.Request) *mcp.Server {
 		return server
