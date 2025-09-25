@@ -246,7 +246,7 @@ func (t *Tools) ListKubernetesResources(_ context.Context, toolReq *mcp.CallTool
 	}, nil, nil
 }
 
-func (t *Tools) GetPodDetails(_ context.Context, toolReq *mcp.CallToolRequest, params GetPodDetailsParams) (*mcp.CallToolResult, any, error) {
+func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, params GetPodDetailsParams) (*mcp.CallToolResult, any, error) {
 	rancherURL := toolReq.Extra.Header.Get(urlHeader)
 	reqUrl := rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint + "/pods/" + params.Namespace + "/" + params.Name
 	podResp, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
@@ -293,8 +293,15 @@ func (t *Tools) GetPodDetails(_ context.Context, toolReq *mcp.CallToolRequest, p
 		return nil, nil, err
 	}
 
+	logs, err := t.getPodLogs(ctx, rancherURL, params.Cluster, toolReq.Extra.Header.Get(tokenHeader), pod)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	response := "Pod = " + podResp + "\nDeployment = " + deploymentResp + "\nMetrics = " + metricResp + "\nLogs = " + logs
+
 	return &mcp.CallToolResult{
-		Content: []mcp.Content{&mcp.TextContent{Text: podResp + deploymentResp + metricResp}},
+		Content: []mcp.Content{&mcp.TextContent{Text: response}},
 	}, nil, nil
 }
 
@@ -342,33 +349,49 @@ func (t *Tools) GetNodes(_ context.Context, toolReq *mcp.CallToolRequest, params
 	}, nil, nil
 }
 
-func (t *Tools) GetPodLogs(ctx context.Context, toolReq *mcp.CallToolRequest, params GetPodLogsParams) (*mcp.CallToolResult, any, error) {
-	rancherURL := toolReq.Extra.Header.Get(urlHeader)
-	clusterURL := rancherURL + "/k8s/clusters/" + params.Cluster
-	clientset, err := t.createClientSetFunc(toolReq.Extra.Header.Get(tokenHeader), clusterURL)
+type ContainerLogs struct {
+	Logs map[string]string `json:"logs"`
+}
+
+// TODO modify unit test if we decided to follow this approach once manual evaluation is completed
+func (t *Tools) getPodLogs(ctx context.Context, url string, cluster string, token string, pod corev1.Pod) (string, error) {
+	clusterURL := url + "/k8s/clusters/" + cluster
+	clientset, err := t.createClientSetFunc(token, clusterURL)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create clientset: %w", err)
-	}
-	podLogOptions := corev1.PodLogOptions{
-		TailLines: ptr.To[int64](50),
-		Container: params.Container,
+		return "", fmt.Errorf("failed to create clientset: %w", err)
 	}
 
-	req := clientset.CoreV1().Pods(params.Namespace).GetLogs(params.Name, &podLogOptions)
-	podLogs, err := req.Stream(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open log stream: %v", err)
-	}
-	defer podLogs.Close()
-	buf := new(bytes.Buffer)
-	_, err = io.Copy(buf, podLogs)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to copy log stream to buffer: %v", err)
+	logs := ContainerLogs{
+		Logs: make(map[string]string),
 	}
 
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{&mcp.TextContent{Text: buf.String()}},
-	}, nil, nil
+	for _, container := range pod.Spec.Containers {
+		podLogOptions := corev1.PodLogOptions{
+			TailLines: ptr.To[int64](50),
+			Container: container.Name,
+		}
+
+		req := clientset.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &podLogOptions)
+		podLogs, err := req.Stream(ctx)
+		if err != nil {
+			return "", fmt.Errorf("failed to open log stream: %v", err)
+		}
+		buf := new(bytes.Buffer)
+		_, err = io.Copy(buf, podLogs)
+		if err != nil {
+			return "", fmt.Errorf("failed to copy log stream to buffer: %v", err)
+		}
+		logs.Logs[container.Name] = buf.String()
+		if err := podLogs.Close(); err != nil {
+			return "", fmt.Errorf("failed to close pod logs stream: %v", err)
+		}
+	}
+	jsonData, err := json.Marshal(logs)
+	if err != nil {
+		return "", fmt.Errorf("error marshalling pod logs:", err)
+	}
+
+	return string(jsonData), nil
 }
 
 func doRequest(url string, token string) (string, error) {

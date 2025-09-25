@@ -53,13 +53,13 @@ namespace (string): The namespace where the resource are located. It must be emp
 cluster (string): The name of the Kubernetes cluster.`},
 		tools.ListKubernetesResources)
 	mcp.AddTool(server, &mcp.Tool{
-		Name: "getPod",
-		Description: `Description: Returns a Pod, its parent Deployment or StatefulSet and the CPU and memory consumption. It must be used for troubleshooting problems with pods.'
+		Name: "inspectPod",
+		Description: `Description: Returns all information related to a Pod. It includes its parent Deployment or StatefulSet, the CPU and memory consumption and the logs. It must be used for troubleshooting problems with pods.'
 Parameters:
 namespace (string): The namespace where the resource are located.
 cluster (string): The name of the Kubernetes cluster.
 name (string): The name of the Pod.`},
-		tools.GetPodDetails)
+		tools.InspectPod)
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "getDeployment",
 		Description: `Description: Returns a Deployment and its Pods. It must be used for troubleshooting problems with deployments.'
@@ -84,15 +84,6 @@ cluster (string): The name of the Kubernetes cluster.`},
 		cluster (string): The name of the Kubernetes cluster. Empty for single container pods.
 		resource (json): Resource to be created. This must be a JSON object.`},
 				tools.CreateKubernetesResource)*/
-	mcp.AddTool(server, &mcp.Tool{
-		Name: "getPodLogs",
-		Description: `Returns logs from a pod.'
-Parameters:
-namespace (string): The namespace where the pod is located.
-name (string): The name of the pod.
-container (string, optional): The name of the container. Leave empty if not specified.
-cluster (string): The name of the Kubernetes cluster.`},
-		tools.GetPodLogs)
 
 	handler := mcp.NewStreamableHTTPHandler(func(request *http.Request) *mcp.Server {
 		return server
