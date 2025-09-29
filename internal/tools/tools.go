@@ -4,10 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"net/http"
+	"k8s.io/apimachinery/pkg/runtime"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -19,16 +18,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/utils/ptr"
 )
 
 const (
-	steveEndpoint = "v1"
-	tokenHeader   = "R_token"
-	urlHeader     = "R_url"
+	tokenHeader      = "R_token"
+	urlHeader        = "R_url"
+	podLogsTailLines = 50
 )
 
 // TODO add missing resources
@@ -58,17 +54,8 @@ var k8sKindsToGVRs = map[string]schema.GroupVersionResource{
 	"gitrepo":                 {Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "gitrepos"},
 }
 
-// GetKubernetesResourceParams defines the structure for requesting a general Kubernetes resource.
-// It includes fields required to uniquely identify a resource within a cluster.
-type GetKubernetesResourceParams struct {
-	Name      string `json:"name" jsonschema:"the name of k8s resource"`
-	Namespace string `json:"namespace" jsonschema:"the namespace of the resource"`
-	Kind      string `json:"kind" jsonschema:"the kind of the resource"`
-	Cluster   string `json:"cluster" jsonschema:"the cluster of the resource"`
-}
-
-// GetPodDetailsParams specifies the parameters needed to retrieve details about a specific pod.
-type GetPodDetailsParams struct {
+// ResourceParams uniquely identifies a specific named resource within a cluster.
+type ResourceParams struct {
 	Name      string `json:"name" jsonschema:"the name of k8s resource"`
 	Namespace string `json:"namespace" jsonschema:"the namespace of the resource"`
 	Kind      string `json:"kind" jsonschema:"the kind of the resource"`
@@ -78,14 +65,6 @@ type GetPodDetailsParams struct {
 // GetNodesParams specifies the parameters needed to retrieve node metrics.
 type GetNodesParams struct {
 	Cluster string `json:"cluster" jsonschema:"the cluster of the resource"`
-}
-
-// GetPodLogsParams specifies the parameters needed to retrieve logs from a specific pod.
-type GetPodLogsParams struct {
-	Name      string `json:"name" jsonschema:"the name of k8s resource"`
-	Namespace string `json:"namespace" jsonschema:"the namespace of the resource"`
-	Cluster   string `json:"cluster" jsonschema:"the cluster of the resource"`
-	Container string `json:"container" jsonschema:"the container of the pod"`
 }
 
 // UpdateKubernetesResourceParams defines the structure for updating a general Kubernetes resource.
@@ -114,149 +93,170 @@ type ListKubernetesResourcesParams struct {
 	Cluster   string `json:"cluster" jsonschema:"the cluster of the resource"`
 }
 
-type Tools struct {
-	createDynamicClientFunc func(token string, url string) (dynamic.Interface, error)
-	createClientSetFunc     func(token string, url string) (kubernetes.Interface, error)
+// SpecificResourceParams uniquely identifies a resource with a known kind within a cluster.
+type SpecificResourceParams struct {
+	Name      string `json:"name" jsonschema:"the name of k8s resource"`
+	Namespace string `json:"namespace" jsonschema:"the namespace of the resource"`
+	Cluster   string `json:"cluster" jsonschema:"the cluster of the resource"`
 }
 
+// ContainerLogs holds logs for multiple containers.
+type ContainerLogs struct {
+	Logs map[string]string `json:"logs"`
+}
+
+// clientCreator defines an interface for creating Kubernetes clients.
+type clientCreator interface {
+	getResourceInterface(token string, url string, namespace string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error)
+	createClientSet(token string, url string) (kubernetes.Interface, error)
+}
+
+// resourceFetcher defines an interface for fetching Kubernetes resources.
+type resourceFetcher interface {
+	fetchK8sResource(params fetchParams) (*unstructured.Unstructured, error)
+	fetchK8sResources(params fetchParams) ([]*unstructured.Unstructured, error)
+}
+
+// Tools contains all tools for the MCP server
+type Tools struct {
+	fetcher resourceFetcher
+	client  clientCreator
+}
+
+// NewTools creates and returns a new Tools instance.
 func NewTools() *Tools {
 	return &Tools{
-		createDynamicClientFunc: createDynamicClient,
-		createClientSetFunc:     createClientSet,
+		fetcher: newSteveFetcher(),
+		client:  newClient(),
 	}
 }
 
-func (t *Tools) GetResource(_ context.Context, toolReq *mcp.CallToolRequest, params GetKubernetesResourceParams) (*mcp.CallToolResult, any, error) {
-	rancherURL := toolReq.Extra.Header.Get(urlHeader)
-	kind := strings.ToLower(params.Kind)
-	reqUrl := rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint
-	if k8sKindsToGVRs[kind].Group != "" {
-		reqUrl += "/" + k8sKindsToGVRs[kind].Group + "." + kind
-	} else {
-		reqUrl += "/" + kind
-	}
-	if params.Namespace != "" {
-		reqUrl += "/" + params.Namespace
-	}
-	reqUrl += "/" + params.Name
-	resp, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get resouce %s in namesapce %s: %w", params.Name, params.Namespace, err)
-	}
-
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{&mcp.TextContent{Text: resp}},
-	}, nil, nil
-}
-
-func (t *Tools) UpdateKubernetesResource(ctx context.Context, toolReq *mcp.CallToolRequest, params UpdateKubernetesResourceParams) (*mcp.CallToolResult, any, error) {
-	rancherURL := toolReq.Extra.Header.Get(urlHeader)
-	clusterURL := rancherURL + "/k8s/clusters/" + params.Cluster
-	dynClient, err := t.createDynamicClientFunc(toolReq.Extra.Header.Get(tokenHeader), clusterURL)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create dynamic client: %w", err)
-	}
-	patchBytes, err := json.Marshal(params.Patch)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create patch: %w", err)
-	}
-	var obj *unstructured.Unstructured
-	kind := strings.ToLower(params.Kind)
-	if params.Namespace != "" {
-		obj, err = dynClient.Resource(k8sKindsToGVRs[kind]).Namespace(params.Namespace).Patch(ctx, params.Name, types.JSONPatchType, patchBytes, metav1.PatchOptions{})
-	} else {
-		obj, err = dynClient.Resource(k8sKindsToGVRs[kind]).Patch(ctx, params.Name, types.JSONPatchType, patchBytes, metav1.PatchOptions{})
-	}
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to update resource %s in namespace %s: %w", params.Name, params.Namespace, err)
-	}
-	objBytes, err := json.Marshal(obj)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to marshal response: %w", err)
-	}
-	respWithoutManagedFields, err := removeManagedFieldsIfPresent(objBytes)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to remove managedFields: %w", err)
-	}
-
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{&mcp.TextContent{Text: string(respWithoutManagedFields)}},
-	}, nil, nil
-}
-
-func (t *Tools) CreateKubernetesResource(ctx context.Context, toolReq *mcp.CallToolRequest, params CreateKubernetesResourceParams) (*mcp.CallToolResult, any, error) {
-	rancherURL := toolReq.Extra.Header.Get(urlHeader)
-	clusterURL := rancherURL + "/k8s/clusters/" + params.Cluster
-	dynClient, err := t.createDynamicClientFunc(toolReq.Extra.Header.Get(tokenHeader), clusterURL)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create dynamic client: %w", err)
-	}
-	objBytes, err := json.Marshal(params.Resource)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create patch: %w", err)
-	}
-	unstructuredObj := &unstructured.Unstructured{}
-	err = json.Unmarshal(objBytes, unstructuredObj)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create unstructure object: %w", err)
-	}
-	var obj *unstructured.Unstructured
-	kind := strings.ToLower(params.Kind)
-	if params.Namespace != "" {
-		obj, err = dynClient.Resource(k8sKindsToGVRs[kind]).Namespace(params.Namespace).Create(ctx, unstructuredObj, metav1.CreateOptions{})
-	} else {
-		obj, err = dynClient.Resource(k8sKindsToGVRs[kind]).Create(ctx, unstructuredObj, metav1.CreateOptions{})
-	}
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to update resource %s in namespace %s: %w", params.Name, params.Namespace, err)
-	}
-	objBytes, err = json.Marshal(obj)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to marshal response: %w", err)
-	}
-	respWithoutManagedFields, err := removeManagedFieldsIfPresent(objBytes)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to remove managedFields: %w", err)
-	}
-
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{&mcp.TextContent{Text: string(respWithoutManagedFields)}},
-	}, nil, nil
-}
-
-func (t *Tools) ListKubernetesResources(_ context.Context, toolReq *mcp.CallToolRequest, params ListKubernetesResourcesParams) (*mcp.CallToolResult, any, error) {
-	rancherURL := toolReq.Extra.Header.Get(urlHeader)
-	kind := strings.ToLower(params.Kind)
-	reqUrl := rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint
-	if k8sKindsToGVRs[kind].Group != "" {
-		reqUrl += "/" + k8sKindsToGVRs[kind].Group + "." + kind
-	} else {
-		reqUrl += "/" + kind
-	}
-	if params.Namespace != "" {
-		reqUrl += "/" + params.Namespace
-	}
-	resp, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to list resources: %w", err)
-	}
-
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{&mcp.TextContent{Text: resp}},
-	}, nil, nil
-}
-
-func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, params GetPodDetailsParams) (*mcp.CallToolResult, any, error) {
-	rancherURL := toolReq.Extra.Header.Get(urlHeader)
-	reqUrl := rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint + "/pods/" + params.Namespace + "/" + params.Name
-	podResp, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
+// GetResource retrieves a specific Kubernetes resource based on the provided parameters.
+func (t *Tools) GetResource(_ context.Context, toolReq *mcp.CallToolRequest, params ResourceParams) (*mcp.CallToolResult, any, error) {
+	resource, err := t.fetcher.fetchK8sResource(fetchParams{
+		cluster:   params.Cluster,
+		kind:      params.Kind,
+		namespace: params.Namespace,
+		name:      params.Name,
+		url:       toolReq.Extra.Header.Get(urlHeader),
+		token:     toolReq.Extra.Header.Get(tokenHeader),
+	})
 	if err != nil {
 		return nil, nil, err
 	}
-	var pod corev1.Pod
-	if err := json.Unmarshal([]byte(podResp), &pod); err != nil {
-		return nil, nil, fmt.Errorf("error parsing pod response : %w", err)
+
+	mcpResponse, err := createMcpResponse([]*unstructured.Unstructured{resource}, params.Namespace, params.Kind, params.Cluster)
+	if err != nil {
+		return nil, nil, err
 	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: mcpResponse}},
+	}, nil, nil
+}
+
+// ListKubernetesResources lists Kubernetes resources of a specific kind and namespace.
+func (t *Tools) ListKubernetesResources(_ context.Context, toolReq *mcp.CallToolRequest, params ListKubernetesResourcesParams) (*mcp.CallToolResult, any, error) {
+	resources, err := t.fetcher.fetchK8sResources(fetchParams{
+		cluster:   params.Cluster,
+		kind:      params.Kind,
+		namespace: params.Namespace,
+		url:       toolReq.Extra.Header.Get(urlHeader),
+		token:     toolReq.Extra.Header.Get(tokenHeader),
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	mcpResponse, err := createMcpResponse(resources, params.Namespace, params.Kind, params.Cluster)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: mcpResponse}},
+	}, nil, nil
+}
+
+// UpdateKubernetesResource updates a specific Kubernetes resource using a JSON patch.
+func (t *Tools) UpdateKubernetesResource(ctx context.Context, toolReq *mcp.CallToolRequest, params UpdateKubernetesResourceParams) (*mcp.CallToolResult, any, error) {
+	resourceInterface, err := t.client.getResourceInterface(toolReq.Extra.Header.Get(tokenHeader), toolReq.Extra.Header.Get(urlHeader), params.Namespace, k8sKindsToGVRs[strings.ToLower(params.Kind)])
+	if err != nil {
+		return nil, nil, err
+	}
+
+	patchBytes, err := json.Marshal(params.Patch)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal patch: %w", err)
+	}
+
+	obj, err := resourceInterface.Patch(ctx, params.Name, types.JSONPatchType, patchBytes, metav1.PatchOptions{})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to patch resource %s: %w", params.Name, err)
+	}
+
+	mcpResponse, err := createMcpResponse([]*unstructured.Unstructured{obj}, params.Namespace, params.Kind, params.Cluster) //string(respWithoutManagedFields)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: mcpResponse}},
+	}, nil, nil
+}
+
+// CreateKubernetesResource creates a new Kubernetes resource.
+func (t *Tools) CreateKubernetesResource(ctx context.Context, toolReq *mcp.CallToolRequest, params CreateKubernetesResourceParams) (*mcp.CallToolResult, any, error) {
+	resourceInterface, err := t.client.getResourceInterface(toolReq.Extra.Header.Get(tokenHeader), toolReq.Extra.Header.Get(urlHeader), params.Namespace, k8sKindsToGVRs[strings.ToLower(params.Kind)])
+	if err != nil {
+		return nil, nil, err
+	}
+
+	objBytes, err := json.Marshal(params.Resource)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal resource: %w", err)
+	}
+
+	unstructuredObj := &unstructured.Unstructured{}
+	if err := json.Unmarshal(objBytes, unstructuredObj); err != nil {
+		return nil, nil, fmt.Errorf("failed to create unstructured object: %w", err)
+	}
+
+	obj, err := resourceInterface.Create(ctx, unstructuredObj, metav1.CreateOptions{})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create resource %s: %w", params.Name, err)
+	}
+
+	mcpResponse, err := createMcpResponse([]*unstructured.Unstructured{obj}, params.Namespace, params.Kind, params.Cluster) //string(respWithoutManagedFields)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: mcpResponse}},
+	}, nil, nil
+}
+
+// InspectPod retrieves detailed information about a specific pod, its owner, metrics, and logs.
+func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, params SpecificResourceParams) (*mcp.CallToolResult, any, error) {
+	podResource, err := t.fetcher.fetchK8sResource(fetchParams{
+		cluster:   params.Cluster,
+		kind:      "pod",
+		namespace: params.Namespace,
+		name:      params.Name,
+		url:       toolReq.Extra.Header.Get(urlHeader),
+		token:     toolReq.Extra.Header.Get(tokenHeader),
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var pod corev1.Pod
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(podResource.Object, &pod); err != nil {
+		return nil, nil, fmt.Errorf("failed to convert unstructured object to Pod: %w", err)
+	}
+
+	// find the parent of the pod
 	var replicaSetName string
 	for _, or := range pod.OwnerReferences {
 		if or.Kind == "ReplicaSet" {
@@ -264,81 +264,138 @@ func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 			break
 		}
 	}
-	reqUrl = rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint + "/apps.replicasets/" + params.Namespace + "/" + replicaSetName
-	replicaSetResp, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
+	replicaSetResource, err := t.fetcher.fetchK8sResource(fetchParams{
+		cluster:   params.Cluster,
+		kind:      "replicaset",
+		namespace: params.Namespace,
+		name:      replicaSetName,
+		url:       toolReq.Extra.Header.Get(urlHeader),
+		token:     toolReq.Extra.Header.Get(tokenHeader),
+	})
 	if err != nil {
 		return nil, nil, err
 	}
+
 	var replicaSet appsv1.ReplicaSet
-	if err := json.Unmarshal([]byte(replicaSetResp), &replicaSet); err != nil {
-		return nil, nil, fmt.Errorf("error parsing replicaset response : %w", err)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(replicaSetResource.Object, &replicaSetResource); err != nil {
+		return nil, nil, fmt.Errorf("failed to convert unstructured object to Pod: %w", err)
 	}
-	// TODO check for replicaset or demonset
-	var deploymentName string
+
+	var parentName, parentKind string
 	for _, or := range replicaSet.OwnerReferences {
 		if or.Kind == "Deployment" {
-			deploymentName = or.Name
+			parentName = or.Name
+			parentKind = or.Kind
+			break
+		}
+		if or.Kind == "StatefulSet" {
+			parentName = or.Name
+			parentKind = or.Kind
+			break
+		}
+		if or.Kind == "DaemonSet" {
+			parentName = or.Name
+			parentKind = or.Kind
 			break
 		}
 	}
-	reqUrl = rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint + "/apps.deployments/" + params.Namespace + "/" + deploymentName
-	deploymentResp, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
+	parentResource, err := t.fetcher.fetchK8sResource(fetchParams{
+		cluster:   params.Cluster,
+		kind:      parentKind,
+		namespace: params.Namespace,
+		name:      parentName,
+		url:       toolReq.Extra.Header.Get(urlHeader),
+		token:     toolReq.Extra.Header.Get(tokenHeader),
+	})
 	if err != nil {
 		return nil, nil, err
 	}
 
-	reqUrl = rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint + "/metrics.k8s.io.pods/" + params.Namespace + "/" + params.Name
-	metricResp, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
+	podMetrics, err := t.fetcher.fetchK8sResource(fetchParams{
+		cluster:   params.Cluster,
+		kind:      "metrics.k8s.io.pods",
+		namespace: params.Namespace,
+		name:      params.Name,
+		url:       toolReq.Extra.Header.Get(urlHeader),
+		token:     toolReq.Extra.Header.Get(tokenHeader),
+	})
 	if err != nil {
 		return nil, nil, err
 	}
 
-	logs, err := t.getPodLogs(ctx, rancherURL, params.Cluster, toolReq.Extra.Header.Get(tokenHeader), pod)
+	logs, err := t.getPodLogs(ctx, toolReq.Extra.Header.Get(urlHeader), params.Cluster, toolReq.Extra.Header.Get(tokenHeader), pod)
 	if err != nil {
 		return nil, nil, err
 	}
+	logsText := "Logs for all containers: \n" + logs
 
-	response := "Pod = " + podResp + "\nDeployment = " + deploymentResp + "\nMetrics = " + metricResp + "\nLogs = " + logs
+	mcpResponse, err := createMcpResponse([]*unstructured.Unstructured{podResource, parentResource, podMetrics}, params.Namespace, "pod", params.Cluster, logsText)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	return &mcp.CallToolResult{
-		Content: []mcp.Content{&mcp.TextContent{Text: response}},
+		Content: []mcp.Content{&mcp.TextContent{Text: mcpResponse}},
 	}, nil, nil
 }
 
-func (t *Tools) GetDeploymentDetails(_ context.Context, toolReq *mcp.CallToolRequest, params GetPodDetailsParams) (*mcp.CallToolResult, any, error) {
-	rancherURL := toolReq.Extra.Header.Get(urlHeader)
-	reqUrl := rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint + "/apps.deployments/" + params.Namespace + "/" + params.Name
-	deploymentResp, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
+// GetDeploymentDetails retrieves details about a deployment and its associated pods.
+func (t *Tools) GetDeploymentDetails(_ context.Context, toolReq *mcp.CallToolRequest, params SpecificResourceParams) (*mcp.CallToolResult, any, error) {
+	deploymentResource, err := t.fetcher.fetchK8sResource(fetchParams{
+		cluster:   params.Cluster,
+		kind:      "deployment",
+		namespace: params.Namespace,
+		name:      params.Name,
+		url:       toolReq.Extra.Header.Get(urlHeader),
+		token:     toolReq.Extra.Header.Get(tokenHeader),
+	})
 	if err != nil {
 		return nil, nil, err
 	}
+
 	var deployment appsv1.Deployment
-	if err := json.Unmarshal([]byte(deploymentResp), &deployment); err != nil {
-		return nil, nil, fmt.Errorf("error parsing pod response : %w", err)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(deploymentResource.Object, &deployment); err != nil {
+		return nil, nil, fmt.Errorf("failed to convert unstructured object to Pod: %w", err)
 	}
+
+	// find all pods for this deployment
 	filter := ""
 	for k, v := range deployment.Spec.Selector.MatchLabels {
 		filter = filter + "filter=metadata.labels." + k + "=" + v + "&"
 	}
 	filter = filter[:len(filter)-1]
-	reqUrl = rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint + "/pods/" + params.Namespace + "?" + filter
-	podResp, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
+	pods, err := t.fetcher.fetchK8sResources(fetchParams{
+		cluster:   params.Cluster,
+		kind:      "deployment",
+		namespace: params.Namespace,
+		name:      params.Name,
+		url:       toolReq.Extra.Header.Get(urlHeader),
+		token:     toolReq.Extra.Header.Get(tokenHeader),
+		filter:    filter,
+	})
 	if err != nil {
 		return nil, nil, err
 	}
+
+	mcpResponse, err := createMcpResponse(append([]*unstructured.Unstructured{deploymentResource}, pods...), params.Namespace, "pod", params.Cluster)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	return &mcp.CallToolResult{
-		Content: []mcp.Content{&mcp.TextContent{Text: deploymentResp + podResp}},
+		Content: []mcp.Content{&mcp.TextContent{Text: mcpResponse}},
 	}, nil, nil
 }
 
+// GetNodes retrieves information and metrics for all nodes in a given cluster.
 func (t *Tools) GetNodes(_ context.Context, toolReq *mcp.CallToolRequest, params GetNodesParams) (*mcp.CallToolResult, any, error) {
 	rancherURL := toolReq.Extra.Header.Get(urlHeader)
-	reqUrl := rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint + "/nodes"
+	reqUrl := rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpointVersion + "/nodes"
 	nodeResp, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
 	if err != nil {
 		return nil, nil, err
 	}
-	reqUrl = rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpoint + "/metrics.k8s.io.nodes"
+	reqUrl = rancherURL + "/k8s/clusters/" + params.Cluster + "/" + steveEndpointVersion + "/metrics.k8s.io.nodes"
 	metricsResp, err := doRequest(reqUrl, toolReq.Extra.Header.Get(tokenHeader))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get metrics: %w", err)
@@ -349,28 +406,20 @@ func (t *Tools) GetNodes(_ context.Context, toolReq *mcp.CallToolRequest, params
 	}, nil, nil
 }
 
-type ContainerLogs struct {
-	Logs map[string]string `json:"logs"`
-}
-
-// TODO modify unit test if we decided to follow this approach once manual evaluation is completed
 func (t *Tools) getPodLogs(ctx context.Context, url string, cluster string, token string, pod corev1.Pod) (string, error) {
 	clusterURL := url + "/k8s/clusters/" + cluster
-	clientset, err := t.createClientSetFunc(token, clusterURL)
+	clientset, err := t.client.createClientSet(token, clusterURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to create clientset: %w", err)
 	}
-
 	logs := ContainerLogs{
 		Logs: make(map[string]string),
 	}
-
 	for _, container := range pod.Spec.Containers {
 		podLogOptions := corev1.PodLogOptions{
-			TailLines: ptr.To[int64](50),
+			TailLines: ptr.To[int64](podLogsTailLines),
 			Container: container.Name,
 		}
-
 		req := clientset.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &podLogOptions)
 		podLogs, err := req.Stream(ctx)
 		if err != nil {
@@ -388,105 +437,8 @@ func (t *Tools) getPodLogs(ctx context.Context, url string, cluster string, toke
 	}
 	jsonData, err := json.Marshal(logs)
 	if err != nil {
-		return "", fmt.Errorf("error marshalling pod logs:", err)
+		return "", fmt.Errorf("error marshalling pod logs: %w", err)
 	}
 
 	return string(jsonData), nil
-}
-
-func doRequest(url string, token string) (string, error) {
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return "", fmt.Errorf("error creating request: %w", err)
-	}
-	req.Header.Set("Cookie", "R_SESS="+token)
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("error doing request: %w", err)
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("error reading response body: %w", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return "", errors.New(string(body))
-	}
-
-	respWithoutManagedFields, err := removeManagedFieldsIfPresent(body)
-	if err != nil {
-		return "", fmt.Errorf("error removing managedFields: %w", err)
-	}
-
-	return string(respWithoutManagedFields), nil
-}
-
-func createRestConfig(token string, url string) (*rest.Config, error) {
-	kubeconfig := clientcmdapi.NewConfig()
-	kubeconfig.Clusters["cluster"] = &clientcmdapi.Cluster{
-		Server: url,
-	}
-	kubeconfig.AuthInfos["mcp"] = &clientcmdapi.AuthInfo{
-		Token: token,
-	}
-	kubeconfig.Contexts["cluster"] = &clientcmdapi.Context{
-		Cluster:  "cluster",
-		AuthInfo: "mcp",
-	}
-	kubeconfig.CurrentContext = "cluster"
-	restConfig, err := clientcmd.NewNonInteractiveClientConfig(
-		*kubeconfig,
-		kubeconfig.CurrentContext,
-		&clientcmd.ConfigOverrides{},
-		nil,
-	).ClientConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	return restConfig, nil
-}
-
-func createClientSet(token string, url string) (kubernetes.Interface, error) {
-	restConfig, err := createRestConfig(token, url)
-	if err != nil {
-		return nil, err
-	}
-
-	return kubernetes.NewForConfig(restConfig)
-}
-
-func createDynamicClient(token string, url string) (dynamic.Interface, error) {
-	restConfig, err := createRestConfig(token, url)
-	if err != nil {
-		return nil, err
-	}
-	dynClient, err := dynamic.NewForConfig(restConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	return dynClient, nil
-}
-
-func removeManagedFieldsIfPresent(obj []byte) ([]byte, error) {
-	var result map[string]interface{}
-	err := json.Unmarshal(obj, &result)
-	if err != nil {
-		// nothing to do
-		return obj, nil
-	}
-	metadata, ok := result["metadata"].(map[string]interface{})
-	if !ok {
-		// nothing to do
-		return obj, nil
-	}
-	delete(metadata, "managedFields")
-	respWithoutManagedFields, err := json.Marshal(result)
-	if err != nil {
-		return nil, err
-	}
-
-	return respWithoutManagedFields, nil
 }
