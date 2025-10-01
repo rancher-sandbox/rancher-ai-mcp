@@ -1,4 +1,4 @@
-package tools
+package k8s
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -9,16 +9,16 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-// client is a struct that provides methods for interacting with Kubernetes clusters.
-type client struct{}
+// Client is a struct that provides methods for interacting with Kubernetes clusters.
+type Client struct{}
 
-// newClient creates and returns a new instance of the client struct.
-func newClient() *client {
-	return &client{}
+// NewClient creates and returns a new instance of the Client struct.
+func NewClient() *Client {
+	return &Client{}
 }
 
-// createClientSet creates a new Kubernetes clientset for the given token and URL.
-func (c *client) createClientSet(token string, url string) (kubernetes.Interface, error) {
+// CreateClientSet creates a new Kubernetes clientset for the given Token and URL.
+func (c *Client) CreateClientSet(token string, url string) (kubernetes.Interface, error) {
 	restConfig, err := createRestConfig(token, url)
 	if err != nil {
 		return nil, err
@@ -27,8 +27,8 @@ func (c *client) createClientSet(token string, url string) (kubernetes.Interface
 	return kubernetes.NewForConfig(restConfig)
 }
 
-// getResourceInterface returns a dynamic resource interface for the given token, URL, namespace, and GroupVersionResource.
-func (c *client) getResourceInterface(token string, url string, namespace string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error) {
+// GetResourceInterface returns a dynamic resource interface for the given Token, URL, Namespace, and GroupVersionResource.
+func (c *Client) GetResourceInterface(token string, url string, namespace string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error) {
 	restConfig, err := createRestConfig(token, url)
 	if err != nil {
 		return nil, err
@@ -45,20 +45,20 @@ func (c *client) getResourceInterface(token string, url string, namespace string
 	return resourceInterface, nil
 }
 
-// createRestConfig creates a new rest.Config for the given token and URL.
+// createRestConfig creates a new rest.Config for the given Token and URL.
 func createRestConfig(token string, url string) (*rest.Config, error) {
 	kubeconfig := clientcmdapi.NewConfig()
-	kubeconfig.Clusters["cluster"] = &clientcmdapi.Cluster{
+	kubeconfig.Clusters["Cluster"] = &clientcmdapi.Cluster{
 		Server: url,
 	}
 	kubeconfig.AuthInfos["mcp"] = &clientcmdapi.AuthInfo{
 		Token: token,
 	}
-	kubeconfig.Contexts["cluster"] = &clientcmdapi.Context{
-		Cluster:  "cluster",
+	kubeconfig.Contexts["Cluster"] = &clientcmdapi.Context{
+		Cluster:  "Cluster",
 		AuthInfo: "mcp",
 	}
-	kubeconfig.CurrentContext = "cluster"
+	kubeconfig.CurrentContext = "Cluster"
 	restConfig, err := clientcmd.NewNonInteractiveClientConfig(
 		*kubeconfig,
 		kubeconfig.CurrentContext,

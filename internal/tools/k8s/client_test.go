@@ -1,4 +1,4 @@
-package tools
+package k8s
 
 import (
 	"testing"
@@ -16,14 +16,14 @@ func TestCreateRestConfig(t *testing.T) {
 		expectedToken string
 	}{
 		"valid inputs": {
-			token:         "my-secret-token-123",
+			token:         "my-secret-Token-123",
 			url:           "https://my-kubernetes-api.example.com",
 			expectErr:     false,
 			expectedHost:  "https://my-kubernetes-api.example.com",
-			expectedToken: "my-secret-token-123",
+			expectedToken: "my-secret-Token-123",
 		},
 		"failure case with empty URL": {
-			token:     "a-valid-token",
+			token:     "a-valid-Token",
 			url:       "",
 			expectErr: true,
 		},

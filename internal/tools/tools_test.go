@@ -1,152 +1,100 @@
 package tools
 
-/*
-func TestGetKubernetesResource(t *testing.T) {
-	podJSON := `{"apiVersion":"v1","kind":"Pod","metadata":{"name":"rancher"},"spec":{"containers":[{"name":"rancher-container","image":"rancher:latest"}]}}`
-	podJSONWithManagedFields := `{"apiVersion":"v1","kind":"Pod","metadata":{"name":"rancher","managedFields":{"apiVersion": "v1","fieldsType":"FieldsV1"}},"spec":{"containers":[{"name":"rancher-container","image":"rancher:latest"}]}}`
-	deploymentJSON := `{"apiVersion":"apps/v1","kind":"Deployment","metadata":{"name":"nginx-deployment"},"spec":{"replicas":1,"selector":{"matchLabels":{"app":"nginx"}},"template":{"metadata":{"labels":{"app":"nginx"}},"spec":{"containers":[{"name":"nginx","image":"nginx:1.14.2","ports":[{"containerPort":80}]}]}}}}`
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/fake"
+	"mcp/internal/tools/converter"
+	"strings"
+	"testing"
 
-	tests := map[string]struct {
-		params         GetKubernetesResourceParams
-		mockResponse   string
-		expectedPath   string
-		expectedResult string
-		expectedError  string
-	}{
-		"pod": {
-			params:         GetKubernetesResourceParams{Name: "rancher", Kind: "pod", Namespace: "default", Cluster: "local"},
-			mockResponse:   podJSON,
-			expectedPath:   "/k8s/clusters/local/v1/pod/default/rancher",
-			expectedResult: podJSON,
-		},
-		"pod with managed fields": {
-			params:         GetKubernetesResourceParams{Name: "rancher", Kind: "pod", Namespace: "default", Cluster: "local"},
-			mockResponse:   podJSONWithManagedFields,
-			expectedPath:   "/k8s/clusters/local/v1/pod/default/rancher",
-			expectedResult: podJSON,
-		},
-		"deployment": {
-			params:         GetKubernetesResourceParams{Name: "rancher", Kind: "deployment", Namespace: "default", Cluster: "local"},
-			mockResponse:   deploymentJSON,
-			expectedPath:   "/k8s/clusters/local/v1/apps.deployment/default/rancher",
-			expectedResult: deploymentJSON,
-		},
-	}
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"mcp/internal/tools/k8s"
+	"mcp/internal/tools/mocks"
+)
 
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				assert.Equal(t, test.expectedPath, r.URL.Path)
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(test.mockResponse))
-			}))
-			defer mockServer.Close()
-			tools := &Tools{}
+const (
+	fakeUrl   = "https://localhost:8080"
+	fakeToken = "token-xxx"
+)
 
-			result, _, err := tools.GetResource(nil, &mcp.CallToolRequest{
-				Extra: &mcp.RequestExtra{
-					Header: map[string][]string{
-						"R_url": {mockServer.URL},
-					},
+func podUnstructured() *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Pod",
+		"metadata": map[string]interface{}{
+			"name": "rancher",
+		},
+		"spec": map[string]interface{}{
+			"containers": []interface{}{
+				map[string]interface{}{
+					"name":  "rancher-container",
+					"image": "rancher:latest",
 				},
-			}, test.params)
-
-			if test.expectedError != "" {
-				assert.ErrorContains(t, err, test.expectedError)
-			} else {
-				assert.NoError(t, err)
-				assert.JSONEq(t, test.expectedResult, result.Content[0].(*mcp.TextContent).Text)
-			}
-		})
-	}
+			},
+		},
+	}}
 }
 
-func TestUpdateKubernetesResource(t *testing.T) {
+func TestGetKubernetesResource(t *testing.T) {
+	ctlr := gomock.NewController(t)
+
 	tests := map[string]struct {
-		params         UpdateKubernetesResourceParams
-		obj            runtime.Object
-		expectedError  string
-		expectedResult string
+		params              ResourceParams
+		mockResourceFetcher func() ResourceFetcher
+		expectedResult      string
+		expectedError       string
 	}{
-		"update pod": {
-			params: UpdateKubernetesResourceParams{
-				Name:      "pod-1",
-				Namespace: "dev",
-				Kind:      "pod",
-				Cluster:   "local",
-				Patch: []interface{}{
-					map[string]interface{}{
-						"op":    "replace",
-						"path":  "/spec/containers/0/image",
-						"value": "rancher:2",
-					},
-				},
+		"get pod": {
+			params: ResourceParams{Name: "rancher", Kind: "pod", Namespace: "default", Cluster: "local"},
+			mockResourceFetcher: func() ResourceFetcher {
+				mock := mocks.NewMockResourceFetcher(ctlr)
+				mock.EXPECT().FetchK8sResource(k8s.FetchParams{
+					Cluster:   "local",
+					Kind:      "pod",
+					Namespace: "default",
+					Name:      "rancher",
+					URL:       fakeUrl,
+					Token:     fakeToken,
+				}).Return(podUnstructured(), nil)
+
+				return mock
 			},
-			obj: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pod-1",
-					Namespace: "dev",
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "rancher-container",
-							Image: "rancher:1",
-						},
-					},
-				},
-			},
-			expectedResult: `{"apiVersion":"v1","kind":"Pod","metadata":{"name":"pod-1","namespace":"dev"},"spec":{"containers":[{"image":"rancher:2","name":"rancher-container","resources":{}}]},"status":{}}`,
+			expectedResult: `{"llm":"[{\"apiVersion\":\"v1\",\"kind\":\"Pod\",\"metadata\":{\"name\":\"rancher\"},\"spec\":{\"containers\":[{\"image\":\"rancher:latest\",\"name\":\"rancher-container\"}]}}]","uiContext":[{"namespace":"default","kind":"Pod","cluster":"local","name":"rancher","type":"pod"}]}`,
 		},
-		"invalid patch": {
-			params: UpdateKubernetesResourceParams{
-				Name:      "pod-1",
-				Namespace: "dev",
-				Kind:      "pod",
-				Cluster:   "local",
-				Patch: []interface{}{
-					map[string]interface{}{
-						"op":    "invalid",
-						"path":  "/spec/invalid",
-						"value": "rancher:2",
-					},
-				},
+		"error fetching pod": {
+			params: ResourceParams{Name: "rancher", Kind: "pod", Namespace: "default", Cluster: "local"},
+			mockResourceFetcher: func() ResourceFetcher {
+				mock := mocks.NewMockResourceFetcher(ctlr)
+				mock.EXPECT().FetchK8sResource(k8s.FetchParams{
+					Cluster:   "local",
+					Kind:      "pod",
+					Namespace: "default",
+					Name:      "rancher",
+					URL:       fakeUrl,
+					Token:     fakeToken,
+				}).Return(nil, fmt.Errorf("unexpected error"))
+
+				return mock
 			},
-			obj: &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pod-1",
-					Namespace: "dev",
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "rancher-container",
-							Image: "rancher:1",
-						},
-					},
-				},
-			},
-			expectedError: "failed to update resource pod-1 in namespace dev: Unexpected kind: invalid",
+			expectedError: "unexpected error",
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			fakeClient := createFakeDynamicClient(test.obj)
-			tools := &Tools{
-				createDynamicClientFunc: func(token string, url string) (dynamic.Interface, error) {
-					return fakeClient, nil
-				},
-			}
-			result, _, err := tools.UpdateKubernetesResource(nil, &mcp.CallToolRequest{
-				Extra: &mcp.RequestExtra{
-					Header: map[string][]string{
-						"R_url":   {"https://localhost:8080"},
-						"R_token": {"token-xxxx"},
-					},
-				},
+
+			tools := Tools{fetcher: test.mockResourceFetcher()}
+
+			result, _, err := tools.GetResource(context.TODO(), &mcp.CallToolRequest{
+				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}, tokenHeader: {fakeToken}}},
 			}, test.params)
 
 			if test.expectedError != "" {
@@ -160,47 +108,55 @@ func TestUpdateKubernetesResource(t *testing.T) {
 }
 
 func TestListKubernetesResource(t *testing.T) {
-	podsJSON := `["pod1", "pod2"]`
-	deploymentsJSON := `["deployment1", "deployment2"]`
+	ctlr := gomock.NewController(t)
 
 	tests := map[string]struct {
-		params         ListKubernetesResourcesParams
-		mockResponse   string
-		expectedPath   string
-		expectedResult string
-		expectedError  string
+		params              ListKubernetesResourcesParams
+		mockResourceFetcher func() ResourceFetcher
+		expectedResult      string
+		expectedError       string
 	}{
-		"pod": {
-			params:         ListKubernetesResourcesParams{Kind: "pod", Namespace: "default", Cluster: "local"},
-			mockResponse:   podsJSON,
-			expectedPath:   "/k8s/clusters/local/v1/pod/default",
-			expectedResult: podsJSON,
+		"get pod list": {
+			params: ListKubernetesResourcesParams{Kind: "pod", Namespace: "default", Cluster: "local"},
+			mockResourceFetcher: func() ResourceFetcher {
+				mock := mocks.NewMockResourceFetcher(ctlr)
+				mock.EXPECT().FetchK8sResources(k8s.FetchParams{
+					Cluster:   "local",
+					Kind:      "pod",
+					Namespace: "default",
+					URL:       fakeUrl,
+					Token:     fakeToken,
+				}).Return([]*unstructured.Unstructured{podUnstructured(), podUnstructured()}, nil)
+
+				return mock
+			},
+			expectedResult: `{"llm":"[{\"apiVersion\":\"v1\",\"kind\":\"Pod\",\"metadata\":{\"name\":\"rancher\"},\"spec\":{\"containers\":[{\"image\":\"rancher:latest\",\"name\":\"rancher-container\"}]}},{\"apiVersion\":\"v1\",\"kind\":\"Pod\",\"metadata\":{\"name\":\"rancher\"},\"spec\":{\"containers\":[{\"image\":\"rancher:latest\",\"name\":\"rancher-container\"}]}}]","uiContext":[{"namespace":"default","kind":"Pod","cluster":"local","name":"rancher","type":"pod"},{"namespace":"default","kind":"Pod","cluster":"local","name":"rancher","type":"pod"}]}`,
 		},
-		"deployment": {
-			params:         ListKubernetesResourcesParams{Kind: "deployment", Namespace: "default", Cluster: "local"},
-			mockResponse:   deploymentsJSON,
-			expectedPath:   "/k8s/clusters/local/v1/apps.deployment/default",
-			expectedResult: deploymentsJSON,
+		"error fetching pod list": {
+			params: ListKubernetesResourcesParams{Kind: "pod", Namespace: "default", Cluster: "local"},
+			mockResourceFetcher: func() ResourceFetcher {
+				mock := mocks.NewMockResourceFetcher(ctlr)
+				mock.EXPECT().FetchK8sResources(k8s.FetchParams{
+					Cluster:   "local",
+					Kind:      "pod",
+					Namespace: "default",
+					URL:       fakeUrl,
+					Token:     fakeToken,
+				}).Return(nil, fmt.Errorf("unexpected error"))
+
+				return mock
+			},
+			expectedError: "unexpected error",
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				assert.Equal(t, test.expectedPath, r.URL.Path)
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(test.mockResponse))
-			}))
-			defer mockServer.Close()
-			tools := &Tools{}
 
-			result, _, err := tools.ListKubernetesResources(nil, &mcp.CallToolRequest{
-				Extra: &mcp.RequestExtra{
-					Header: map[string][]string{
-						"R_url": {mockServer.URL},
-					},
-				},
+			tools := Tools{fetcher: test.mockResourceFetcher()}
+
+			result, _, err := tools.ListKubernetesResources(context.TODO(), &mcp.CallToolRequest{
+				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}, tokenHeader: {fakeToken}}},
 			}, test.params)
 
 			if test.expectedError != "" {
@@ -213,138 +169,301 @@ func TestListKubernetesResource(t *testing.T) {
 	}
 }
 
-func TestGetNodes(t *testing.T) {
-	nodes := `{"type":"collection","resourceType":"node","count":1,"data":[{"id":"k3d-test-server-0","type":"node","apiVersion":"v1","kind":"Node"}]}`
-	nodesMetrics := `{"type":"collection","resourceType":"metrics.k8s.io.nodemetrics","count":1,"data":[{"id":"k3d-test-server-0","type":"metrics.k8s.io.nodemetrics","apiVersion":"metrics.k8s.io/v1beta1","kind":"NodeMetrics","name":"k3d-test-server-0","relationships":null,"state":{"error":false,"message":"Resourceiscurrent","name":"active","transitioning":false}},"timestamp":"2025-09-18T15:56:28Z","usage":{"cpu":"215886808n","memory":"2794176Ki"},"window":"20.028s"}]}`
+func TestUpdateKubernetesResource(t *testing.T) {
+	ctlr := gomock.NewController(t)
+	patchData := []interface{}{
+		map[string]interface{}{
+			"op":    "replace",
+			"path":  "/metadata/labels/foo",
+			"value": "bar",
+		},
+	}
+
 	tests := map[string]struct {
-		params                   GetNodesParams
-		mockNodesResponse        string
-		mockNodesMetricsResponse string
-		expectedNodesPath        string
-		expectedMetricsPath      string
-		expectedResult           string
-		expectedError            string
+		params            UpdateKubernetesResourceParams
+		mockClientCreator func() ClientCreator
+		expectedResult    string
+		expectedError     string
 	}{
-		"get nodes": {
-			params:                   GetNodesParams{Cluster: "local"},
-			mockNodesResponse:        nodes,
-			mockNodesMetricsResponse: nodesMetrics,
-			expectedNodesPath:        "/k8s/clusters/local/v1/nodes",
-			expectedMetricsPath:      "/k8s/clusters/local/v1/metrics.k8s.io.nodes",
-			expectedResult:           nodes + nodesMetrics,
+		"patch pod": {
+			params: UpdateKubernetesResourceParams{Name: "rancher", Kind: "pod", Namespace: "default", Cluster: "local", Patch: patchData},
+			mockClientCreator: func() ClientCreator {
+				mockResourceInterface := mocks.NewMockResourceInterface(ctlr)
+				patchBytes, _ := json.Marshal(patchData)
+				mockResourceInterface.EXPECT().Patch(context.TODO(), "rancher", types.JSONPatchType, patchBytes, metav1.PatchOptions{}).Return(podUnstructured(), nil)
+
+				mockClientCreator := mocks.NewMockClientCreator(ctlr)
+				mockClientCreator.EXPECT().GetResourceInterface(fakeToken, fakeUrl, "default", converter.K8sKindsToGVRs[strings.ToLower("pod")]).Return(mockResourceInterface, nil)
+
+				return mockClientCreator
+			},
+			expectedResult: `{"llm":"[{\"apiVersion\":\"v1\",\"kind\":\"Pod\",\"metadata\":{\"name\":\"rancher\"},\"spec\":{\"containers\":[{\"image\":\"rancher:latest\",\"name\":\"rancher-container\"}]}}]","uiContext":[{"namespace":"default","kind":"Pod","cluster":"local","name":"rancher","type":"pod"}]}`,
+		},
+		"error patching pod": {
+			params: UpdateKubernetesResourceParams{Name: "rancher", Kind: "pod", Namespace: "default", Cluster: "local", Patch: patchData},
+			mockClientCreator: func() ClientCreator {
+				mockResourceInterface := mocks.NewMockResourceInterface(ctlr)
+				patchBytes, _ := json.Marshal(patchData)
+				mockResourceInterface.EXPECT().Patch(context.TODO(), "rancher", types.JSONPatchType, patchBytes, metav1.PatchOptions{}).Return(nil, fmt.Errorf("unexpected error"))
+
+				mockClientCreator := mocks.NewMockClientCreator(ctlr)
+				mockClientCreator.EXPECT().GetResourceInterface(fakeToken, fakeUrl, "default", converter.K8sKindsToGVRs[strings.ToLower("pod")]).Return(mockResourceInterface, nil)
+
+				return mockClientCreator
+			},
+			expectedError: "unexpected error",
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			tools := &Tools{}
-			mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				switch r.URL.Path {
-				case test.expectedNodesPath:
-					w.WriteHeader(http.StatusOK)
-					w.Write([]byte(test.mockNodesResponse))
-				case test.expectedMetricsPath:
-					w.WriteHeader(http.StatusOK)
-					w.Write([]byte(test.mockNodesMetricsResponse))
-				default:
-					assert.Fail(t, fmt.Sprintf("unexpected path: %s", r.URL.Path))
-				}
-			}))
-			defer mockServer.Close()
 
-			result, _, err := tools.GetNodes(nil, &mcp.CallToolRequest{
-				Extra: &mcp.RequestExtra{
-					Header: map[string][]string{
-						"R_url": {mockServer.URL},
-					},
-				},
+			tools := Tools{client: test.mockClientCreator()}
+
+			result, _, err := tools.UpdateKubernetesResource(context.TODO(), &mcp.CallToolRequest{
+				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}, tokenHeader: {fakeToken}}},
 			}, test.params)
 
 			if test.expectedError != "" {
 				assert.ErrorContains(t, err, test.expectedError)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, test.expectedResult, result.Content[0].(*mcp.TextContent).Text)
+				assert.JSONEq(t, test.expectedResult, result.Content[0].(*mcp.TextContent).Text)
 			}
 		})
 	}
 }
 
-func TestGetPodLogs(t *testing.T) {
-	fakeLogs := "fake logs" // this is hardcoded in the fake client. see fake_pod_expansion.go
+func TestCreateKubernetesResource(t *testing.T) {
+	ctlr := gomock.NewController(t)
 
 	tests := map[string]struct {
-		params         GetPodLogsParams
-		mockClient     func(token string, url string) (kubernetes.Interface, error)
-		expectedError  string
-		expectedResult string
+		params            CreateKubernetesResourceParams
+		mockClientCreator func() ClientCreator
+		expectedResult    string
+		expectedError     string
 	}{
-		"get logs": {
-			params: GetPodLogsParams{
-				Name:      "pod-1",
-				Namespace: "dev",
+		"create pod": {
+			params: CreateKubernetesResourceParams{
+				Name:      "rancher",
+				Kind:      "pod",
+				Namespace: "default",
+				Cluster:   "local",
+				Resource: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata": map[string]interface{}{
+						"name": "rancher",
+					},
+					"spec": map[string]interface{}{
+						"containers": []interface{}{
+							map[string]interface{}{
+								"image": "rancher:latest",
+								"name":  "rancher-container",
+							},
+						},
+					},
+				},
+			},
+			mockClientCreator: func() ClientCreator {
+				mockResourceInterface := mocks.NewMockResourceInterface(ctlr)
+				mockResourceInterface.EXPECT().Create(context.TODO(), podUnstructured(), metav1.CreateOptions{}).Return(podUnstructured(), nil)
+
+				mockClientCreator := mocks.NewMockClientCreator(ctlr)
+				mockClientCreator.EXPECT().GetResourceInterface(fakeToken, fakeUrl, "default", converter.K8sKindsToGVRs[strings.ToLower("pod")]).Return(mockResourceInterface, nil)
+
+				return mockClientCreator
+			},
+
+			expectedResult: `{"llm":"[{\"apiVersion\":\"v1\",\"kind\":\"Pod\",\"metadata\":{\"name\":\"rancher\"},\"spec\":{\"containers\":[{\"image\":\"rancher:latest\",\"name\":\"rancher-container\"}]}}]","uiContext":[{"namespace":"default","kind":"Pod","cluster":"local","name":"rancher","type":"pod"}]}`,
+		},
+		"error creating pod": {
+			params: CreateKubernetesResourceParams{
+				Name:      "rancher",
+				Kind:      "pod",
+				Namespace: "default",
+				Cluster:   "local",
+				Resource: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata": map[string]interface{}{
+						"name": "rancher",
+					},
+					"spec": map[string]interface{}{
+						"containers": []interface{}{
+							map[string]interface{}{
+								"image": "rancher:latest",
+								"name":  "rancher-container",
+							},
+						},
+					},
+				},
+			},
+			mockClientCreator: func() ClientCreator {
+				mockClientCreator := mocks.NewMockClientCreator(ctlr)
+				mockClientCreator.EXPECT().GetResourceInterface(fakeToken, fakeUrl, "default", converter.K8sKindsToGVRs[strings.ToLower("pod")]).Return(nil, fmt.Errorf("unexpected error"))
+
+				return mockClientCreator
+			},
+			expectedError: "unexpected error",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+
+			tools := Tools{client: test.mockClientCreator()}
+
+			result, _, err := tools.CreateKubernetesResource(context.TODO(), &mcp.CallToolRequest{
+				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}, tokenHeader: {fakeToken}}},
+			}, test.params)
+
+			if test.expectedError != "" {
+				assert.ErrorContains(t, err, test.expectedError)
+			} else {
+				assert.NoError(t, err)
+				assert.JSONEq(t, test.expectedResult, result.Content[0].(*mcp.TextContent).Text)
+			}
+		})
+	}
+}
+
+func TestInspectPod(t *testing.T) {
+	ctlr := gomock.NewController(t)
+
+	tests := map[string]struct {
+		params              SpecificResourceParams
+		mockClientCreator   func() ClientCreator
+		mockResourceFetcher func() ResourceFetcher
+		expectedResult      string
+		expectedError       string
+	}{
+		"create pod": {
+			params: SpecificResourceParams{
+				Name:      "rancher",
+				Namespace: "default",
 				Cluster:   "local",
 			},
-			mockClient: func(token string, url string) (kubernetes.Interface, error) {
+			mockClientCreator: func() ClientCreator {
+				mock := mocks.NewMockClientCreator(ctlr)
 				pod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "pod-1",
-						Namespace: "dev",
+						Name:      "rancher",
+						Namespace: "default",
 					},
 				}
+				mock.EXPECT().CreateClientSet(fakeToken, fakeUrl+"/k8s/clusters/local").Return(fake.NewClientset(pod), nil)
 
-				return fake.NewClientset(pod), nil
+				return mock
 			},
-			expectedResult: fakeLogs,
-		},
-		"error creating client": {
-			params: GetPodLogsParams{
-				Name:      "pod-1",
-				Namespace: "dev",
-				Cluster:   "local",
+			mockResourceFetcher: func() ResourceFetcher {
+				mock := mocks.NewMockResourceFetcher(ctlr)
+				mock.EXPECT().FetchK8sResource(k8s.FetchParams{
+					Cluster:   "local",
+					Kind:      "pod",
+					Namespace: "default",
+					Name:      "rancher",
+					URL:       fakeUrl,
+					Token:     fakeToken,
+				}).Return(&unstructured.Unstructured{Object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata": map[string]interface{}{
+						"name": "rancher",
+						"ownerReferences": []interface{}{
+							map[string]interface{}{
+								"apiVersion": "apps/v1",
+								"kind":       "ReplicaSet",
+								"name":       "my-replicaset",
+								"uid":        "uid",
+							},
+						},
+					},
+					"spec": map[string]interface{}{
+						"containers": []interface{}{
+							map[string]interface{}{
+								"name":  "rancher-container",
+								"image": "rancher:latest",
+							},
+						},
+					},
+				}}, nil)
+				mock.EXPECT().FetchK8sResource(k8s.FetchParams{
+					Cluster:   "local",
+					Kind:      "replicaset",
+					Namespace: "default",
+					Name:      "my-replicaset",
+					URL:       fakeUrl,
+					Token:     fakeToken,
+				}).Return(&unstructured.Unstructured{Object: map[string]interface{}{
+					"apiVersion": "apps/v1",
+					"kind":       "ReplicaSet",
+					"metadata": map[string]interface{}{
+						"name": "rancher",
+						"ownerReferences": []interface{}{
+							map[string]interface{}{
+								"apiVersion": "apps/v1",
+								"kind":       "Deployment",
+								"name":       "my-deployment",
+								"uid":        "uid",
+							},
+						},
+					},
+				}}, nil)
+				mock.EXPECT().FetchK8sResource(k8s.FetchParams{
+					Cluster:   "local",
+					Kind:      "Deployment",
+					Namespace: "default",
+					Name:      "my-deployment",
+					URL:       fakeUrl,
+					Token:     fakeToken,
+				}).Return(&unstructured.Unstructured{Object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Deployment",
+					"metadata": map[string]interface{}{
+						"name": "rancher",
+					},
+				}}, nil)
+				mock.EXPECT().FetchK8sResource(k8s.FetchParams{
+					Cluster:   "local",
+					Kind:      "metrics.k8s.io.pods",
+					Namespace: "default",
+					Name:      "rancher",
+					URL:       fakeUrl,
+					Token:     fakeToken,
+				}).Return(&unstructured.Unstructured{Object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "PodMetrics",
+					"metadata": map[string]interface{}{
+						"name": "rancher",
+					},
+				}}, nil)
+
+				return mock
 			},
-			mockClient: func(token string, url string) (kubernetes.Interface, error) {
-				return nil, errors.New("fake error")
-			},
-			expectedError: "failed to create clientset: fake error",
+
+			expectedResult: `{"llm":"[{\"apiVersion\":\"v1\",\"kind\":\"Pod\",\"metadata\":{\"name\":\"rancher\",\"ownerReferences\":[{\"apiVersion\":\"apps/v1\",\"kind\":\"ReplicaSet\",\"name\":\"my-replicaset\",\"uid\":\"uid\"}]},\"spec\":{\"containers\":[{\"image\":\"rancher:latest\",\"name\":\"rancher-container\"}]}},{\"apiVersion\":\"v1\",\"kind\":\"Deployment\",\"metadata\":{\"name\":\"rancher\"}},{\"apiVersion\":\"v1\",\"kind\":\"PodMetrics\",\"metadata\":{\"name\":\"rancher\"}},{\"pod-logs\":{\"rancher-container\":\"fake logs\"}}]","uiContext":[{"namespace":"default","kind":"Pod","cluster":"local","name":"rancher","type":"pod"},{"namespace":"default","kind":"Deployment","cluster":"local","name":"rancher","type":"apps.deployment"},{"namespace":"default","kind":"PodMetrics","cluster":"local","name":"rancher","type":"podmetrics"},{"namespace":"default","kind":"","cluster":"local","name":""}]}`,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			tools := &Tools{
-				createClientSetFunc: test.mockClient,
+
+			tools := Tools{
+				client:  test.mockClientCreator(),
+				fetcher: test.mockResourceFetcher(),
 			}
-			result, _, err := tools.GetPodLogs(context.TODO(), &mcp.CallToolRequest{
-				Extra: &mcp.RequestExtra{
-					Header: map[string][]string{
-						"R_url":   {"https://localhost:8080"},
-						"R_token": {"token-xxxx"},
-					},
-				},
+
+			result, _, err := tools.InspectPod(context.TODO(), &mcp.CallToolRequest{
+				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}, tokenHeader: {fakeToken}}},
 			}, test.params)
 
 			if test.expectedError != "" {
 				assert.ErrorContains(t, err, test.expectedError)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, test.expectedResult, result.Content[0].(*mcp.TextContent).Text)
+				assert.JSONEq(t, test.expectedResult, result.Content[0].(*mcp.TextContent).Text)
 			}
 		})
 	}
 }
-
-// TODO testCreateResource
-// TODO add human validation for create
-
-func createFakeDynamicClient(objects ...runtime.Object) *fakedyn.FakeDynamicClient {
-	scheme := runtime.NewScheme()
-	_ = corev1.AddToScheme(scheme)
-
-	dynClient := fakedyn.NewSimpleDynamicClient(scheme, objects...)
-
-	return dynClient
-}
-*/
