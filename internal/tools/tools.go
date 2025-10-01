@@ -59,7 +59,7 @@ type CreateKubernetesResourceParams struct {
 	Namespace string `json:"namespace" jsonschema:"the namespace of the resource"`
 	Kind      string `json:"kind" jsonschema:"the kind of the resource"`
 	Cluster   string `json:"cluster" jsonschema:"the cluster of the resource"`
-	Resource  any    `json:"patch" jsonschema:"the patch of the request"`
+	Resource  any    `json:"resource" jsonschema:"the resource to be created"`
 }
 
 // ListKubernetesResourcesParams specifies the parameters needed to list kubernetes resources.
