@@ -83,8 +83,8 @@ type ContainerLogs struct {
 
 // ClientCreator defines an interface for creating Kubernetes clients.
 type ClientCreator interface {
-	GetResourceInterface(token string, url string, namespace string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error)
-	CreateClientSet(token string, url string) (kubernetes.Interface, error)
+	GetResourceInterface(token string, url string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error)
+	CreateClientSet(token string, url string, cluster string) (kubernetes.Interface, error)
 }
 
 // ResourceFetcher defines an interface for fetching Kubernetes resources.
@@ -156,7 +156,7 @@ func (t *Tools) ListKubernetesResources(_ context.Context, toolReq *mcp.CallTool
 
 // UpdateKubernetesResource updates a specific Kubernetes resource using a JSON patch.
 func (t *Tools) UpdateKubernetesResource(ctx context.Context, toolReq *mcp.CallToolRequest, params UpdateKubernetesResourceParams) (*mcp.CallToolResult, any, error) {
-	resourceInterface, err := t.client.GetResourceInterface(toolReq.Extra.Header.Get(tokenHeader), toolReq.Extra.Header.Get(urlHeader), params.Namespace, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
+	resourceInterface, err := t.client.GetResourceInterface(toolReq.Extra.Header.Get(tokenHeader), toolReq.Extra.Header.Get(urlHeader), params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
 	if err != nil {
 		return nil, nil, err
 	}
@@ -183,7 +183,7 @@ func (t *Tools) UpdateKubernetesResource(ctx context.Context, toolReq *mcp.CallT
 
 // CreateKubernetesResource creates a new Kubernetes resource.
 func (t *Tools) CreateKubernetesResource(ctx context.Context, toolReq *mcp.CallToolRequest, params CreateKubernetesResourceParams) (*mcp.CallToolResult, any, error) {
-	resourceInterface, err := t.client.GetResourceInterface(toolReq.Extra.Header.Get(tokenHeader), toolReq.Extra.Header.Get(urlHeader), params.Namespace, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
+	resourceInterface, err := t.client.GetResourceInterface(toolReq.Extra.Header.Get(tokenHeader), toolReq.Extra.Header.Get(urlHeader), params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
 	if err != nil {
 		return nil, nil, err
 	}
@@ -395,8 +395,7 @@ func (t *Tools) GetNodes(_ context.Context, toolReq *mcp.CallToolRequest, params
 }
 
 func (t *Tools) getPodLogs(ctx context.Context, url string, cluster string, token string, pod corev1.Pod) (*unstructured.Unstructured, error) {
-	clusterURL := url + "/k8s/clusters/" + cluster
-	clientset, err := t.client.CreateClientSet(token, clusterURL)
+	clientset, err := t.client.CreateClientSet(token, url, cluster)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create clientset: %w", err)
 	}

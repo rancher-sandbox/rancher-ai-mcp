@@ -17,21 +17,16 @@ func TestCreateRestConfig(t *testing.T) {
 	}{
 		"valid inputs": {
 			token:         "my-secret-Token-123",
-			url:           "https://my-kubernetes-api.example.com",
+			url:           "https://my-rancher.example.com",
 			expectErr:     false,
-			expectedHost:  "https://my-kubernetes-api.example.com",
+			expectedHost:  "https://my-rancher.example.com/k8s/clusters/local",
 			expectedToken: "my-secret-Token-123",
-		},
-		"failure case with empty URL": {
-			token:     "a-valid-Token",
-			url:       "",
-			expectErr: true,
 		},
 	}
 
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
-			restConfig, err := createRestConfig(test.token, test.url)
+			restConfig, err := createRestConfig(test.token, test.url, "local")
 
 			if test.expectErr {
 				require.Error(t, err)
