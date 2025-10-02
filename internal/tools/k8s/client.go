@@ -18,8 +18,8 @@ func NewClient() *Client {
 }
 
 // CreateClientSet creates a new Kubernetes clientset for the given Token and URL.
-func (c *Client) CreateClientSet(token string, url string) (kubernetes.Interface, error) {
-	restConfig, err := createRestConfig(token, url)
+func (c *Client) CreateClientSet(token string, url string, cluster string) (kubernetes.Interface, error) {
+	restConfig, err := createRestConfig(token, url, cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -28,8 +28,8 @@ func (c *Client) CreateClientSet(token string, url string) (kubernetes.Interface
 }
 
 // GetResourceInterface returns a dynamic resource interface for the given Token, URL, Namespace, and GroupVersionResource.
-func (c *Client) GetResourceInterface(token string, url string, namespace string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error) {
-	restConfig, err := createRestConfig(token, url)
+func (c *Client) GetResourceInterface(token string, url string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error) {
+	restConfig, err := createRestConfig(token, url, cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -46,10 +46,11 @@ func (c *Client) GetResourceInterface(token string, url string, namespace string
 }
 
 // createRestConfig creates a new rest.Config for the given Token and URL.
-func createRestConfig(token string, url string) (*rest.Config, error) {
+func createRestConfig(token string, url string, cluster string) (*rest.Config, error) {
+	clusterURL := url + "/k8s/clusters/" + cluster
 	kubeconfig := clientcmdapi.NewConfig()
 	kubeconfig.Clusters["Cluster"] = &clientcmdapi.Cluster{
-		Server: url,
+		Server: clusterURL,
 	}
 	kubeconfig.AuthInfos["mcp"] = &clientcmdapi.AuthInfo{
 		Token: token,

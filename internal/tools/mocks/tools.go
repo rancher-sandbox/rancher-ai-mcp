@@ -45,33 +45,33 @@ func (m *MockClientCreator) EXPECT() *MockClientCreatorMockRecorder {
 }
 
 // CreateClientSet mocks base method.
-func (m *MockClientCreator) CreateClientSet(token, url string) (kubernetes.Interface, error) {
+func (m *MockClientCreator) CreateClientSet(token, url, cluster string) (kubernetes.Interface, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateClientSet", token, url)
+	ret := m.ctrl.Call(m, "CreateClientSet", token, url, cluster)
 	ret0, _ := ret[0].(kubernetes.Interface)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateClientSet indicates an expected call of CreateClientSet.
-func (mr *MockClientCreatorMockRecorder) CreateClientSet(token, url any) *gomock.Call {
+func (mr *MockClientCreatorMockRecorder) CreateClientSet(token, url, cluster any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateClientSet", reflect.TypeOf((*MockClientCreator)(nil).CreateClientSet), token, url)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateClientSet", reflect.TypeOf((*MockClientCreator)(nil).CreateClientSet), token, url, cluster)
 }
 
 // GetResourceInterface mocks base method.
-func (m *MockClientCreator) GetResourceInterface(token, url, namespace string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error) {
+func (m *MockClientCreator) GetResourceInterface(token, url, namespace, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetResourceInterface", token, url, namespace, gvr)
+	ret := m.ctrl.Call(m, "GetResourceInterface", token, url, namespace, cluster, gvr)
 	ret0, _ := ret[0].(dynamic.ResourceInterface)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetResourceInterface indicates an expected call of GetResourceInterface.
-func (mr *MockClientCreatorMockRecorder) GetResourceInterface(token, url, namespace, gvr any) *gomock.Call {
+func (mr *MockClientCreatorMockRecorder) GetResourceInterface(token, url, namespace, cluster, gvr any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetResourceInterface", reflect.TypeOf((*MockClientCreator)(nil).GetResourceInterface), token, url, namespace, gvr)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetResourceInterface", reflect.TypeOf((*MockClientCreator)(nil).GetResourceInterface), token, url, namespace, cluster, gvr)
 }
 
 // MockResourceFetcher is a mock of ResourceFetcher interface.

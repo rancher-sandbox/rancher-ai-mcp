@@ -193,7 +193,7 @@ func TestUpdateKubernetesResource(t *testing.T) {
 				mockResourceInterface.EXPECT().Patch(context.TODO(), "rancher", types.JSONPatchType, patchBytes, metav1.PatchOptions{}).Return(podUnstructured(), nil)
 
 				mockClientCreator := mocks.NewMockClientCreator(ctlr)
-				mockClientCreator.EXPECT().GetResourceInterface(fakeToken, fakeUrl, "default", converter.K8sKindsToGVRs[strings.ToLower("pod")]).Return(mockResourceInterface, nil)
+				mockClientCreator.EXPECT().GetResourceInterface(fakeToken, fakeUrl, "default", "local", converter.K8sKindsToGVRs[strings.ToLower("pod")]).Return(mockResourceInterface, nil)
 
 				return mockClientCreator
 			},
@@ -207,7 +207,7 @@ func TestUpdateKubernetesResource(t *testing.T) {
 				mockResourceInterface.EXPECT().Patch(context.TODO(), "rancher", types.JSONPatchType, patchBytes, metav1.PatchOptions{}).Return(nil, fmt.Errorf("unexpected error"))
 
 				mockClientCreator := mocks.NewMockClientCreator(ctlr)
-				mockClientCreator.EXPECT().GetResourceInterface(fakeToken, fakeUrl, "default", converter.K8sKindsToGVRs[strings.ToLower("pod")]).Return(mockResourceInterface, nil)
+				mockClientCreator.EXPECT().GetResourceInterface(fakeToken, fakeUrl, "default", "local", converter.K8sKindsToGVRs[strings.ToLower("pod")]).Return(mockResourceInterface, nil)
 
 				return mockClientCreator
 			},
@@ -270,7 +270,7 @@ func TestCreateKubernetesResource(t *testing.T) {
 				mockResourceInterface.EXPECT().Create(context.TODO(), podUnstructured(), metav1.CreateOptions{}).Return(podUnstructured(), nil)
 
 				mockClientCreator := mocks.NewMockClientCreator(ctlr)
-				mockClientCreator.EXPECT().GetResourceInterface(fakeToken, fakeUrl, "default", converter.K8sKindsToGVRs[strings.ToLower("pod")]).Return(mockResourceInterface, nil)
+				mockClientCreator.EXPECT().GetResourceInterface(fakeToken, fakeUrl, "default", "local", converter.K8sKindsToGVRs[strings.ToLower("pod")]).Return(mockResourceInterface, nil)
 
 				return mockClientCreator
 			},
@@ -301,7 +301,7 @@ func TestCreateKubernetesResource(t *testing.T) {
 			},
 			mockClientCreator: func() ClientCreator {
 				mockClientCreator := mocks.NewMockClientCreator(ctlr)
-				mockClientCreator.EXPECT().GetResourceInterface(fakeToken, fakeUrl, "default", converter.K8sKindsToGVRs[strings.ToLower("pod")]).Return(nil, fmt.Errorf("unexpected error"))
+				mockClientCreator.EXPECT().GetResourceInterface(fakeToken, fakeUrl, "default", "local", converter.K8sKindsToGVRs[strings.ToLower("pod")]).Return(nil, fmt.Errorf("unexpected error"))
 
 				return mockClientCreator
 			},
@@ -352,7 +352,7 @@ func TestInspectPod(t *testing.T) {
 						Namespace: "default",
 					},
 				}
-				mock.EXPECT().CreateClientSet(fakeToken, fakeUrl+"/k8s/clusters/local").Return(fake.NewClientset(pod), nil)
+				mock.EXPECT().CreateClientSet(fakeToken, fakeUrl, "local").Return(fake.NewClientset(pod), nil)
 
 				return mock
 			},
