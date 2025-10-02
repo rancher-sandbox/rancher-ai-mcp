@@ -364,7 +364,7 @@ func (t *Tools) GetDeploymentDetails(_ context.Context, toolReq *mcp.CallToolReq
 
 // GetNodes retrieves information and metrics for all nodes in a given cluster.
 func (t *Tools) GetNodes(_ context.Context, toolReq *mcp.CallToolRequest, params GetNodesParams) (*mcp.CallToolResult, any, error) {
-	nodeResource, err := t.fetcher.FetchK8sResource(k8s.FetchParams{
+	nodeResource, err := t.fetcher.FetchK8sResources(k8s.FetchParams{
 		Cluster: params.Cluster,
 		Kind:    "nodes",
 		URL:     toolReq.Extra.Header.Get(urlHeader),
@@ -374,7 +374,7 @@ func (t *Tools) GetNodes(_ context.Context, toolReq *mcp.CallToolRequest, params
 		return nil, nil, err
 	}
 
-	nodeMetricsResource, err := t.fetcher.FetchK8sResource(k8s.FetchParams{
+	nodeMetricsResource, err := t.fetcher.FetchK8sResources(k8s.FetchParams{
 		Cluster: params.Cluster,
 		Kind:    "metrics.k8s.io.nodes",
 		URL:     toolReq.Extra.Header.Get(urlHeader),
@@ -384,7 +384,7 @@ func (t *Tools) GetNodes(_ context.Context, toolReq *mcp.CallToolRequest, params
 		return nil, nil, err
 	}
 
-	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{nodeResource, nodeMetricsResource}, "", params.Cluster)
+	mcpResponse, err := response.CreateMcpResponse(append(nodeResource, nodeMetricsResource...), "", params.Cluster)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -52,13 +52,17 @@ func CreateMcpResponse(objs []*unstructured.Unstructured, namespace string, clus
 		})
 	}
 
-	llmResponse, err := json.Marshal(objs)
-	if err != nil {
-		return "", err
+	llmResponse := "no resources found"
+	if len(objs) > 0 {
+		llmResponseBytes, err := json.Marshal(objs)
+		if err != nil {
+			return "", err
+		}
+		llmResponse = string(llmResponseBytes)
 	}
 
 	resp := MCPResponse{
-		LLM:       string(llmResponse),
+		LLM:       llmResponse,
 		UIContext: uiContext,
 	}
 	bytes, err := json.Marshal(resp)
