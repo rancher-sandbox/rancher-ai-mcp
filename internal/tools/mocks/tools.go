@@ -10,6 +10,7 @@
 package mocks
 
 import (
+	context "context"
 	k8s "mcp/internal/tools/k8s"
 	reflect "reflect"
 
@@ -20,32 +21,32 @@ import (
 	kubernetes "k8s.io/client-go/kubernetes"
 )
 
-// MockClientCreator is a mock of ClientCreator interface.
-type MockClientCreator struct {
+// MockK8sClient is a mock of K8sClient interface.
+type MockK8sClient struct {
 	ctrl     *gomock.Controller
-	recorder *MockClientCreatorMockRecorder
+	recorder *MockK8sClientMockRecorder
 	isgomock struct{}
 }
 
-// MockClientCreatorMockRecorder is the mock recorder for MockClientCreator.
-type MockClientCreatorMockRecorder struct {
-	mock *MockClientCreator
+// MockK8sClientMockRecorder is the mock recorder for MockK8sClient.
+type MockK8sClientMockRecorder struct {
+	mock *MockK8sClient
 }
 
-// NewMockClientCreator creates a new mock instance.
-func NewMockClientCreator(ctrl *gomock.Controller) *MockClientCreator {
-	mock := &MockClientCreator{ctrl: ctrl}
-	mock.recorder = &MockClientCreatorMockRecorder{mock}
+// NewMockK8sClient creates a new mock instance.
+func NewMockK8sClient(ctrl *gomock.Controller) *MockK8sClient {
+	mock := &MockK8sClient{ctrl: ctrl}
+	mock.recorder = &MockK8sClientMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockClientCreator) EXPECT() *MockClientCreatorMockRecorder {
+func (m *MockK8sClient) EXPECT() *MockK8sClientMockRecorder {
 	return m.recorder
 }
 
 // CreateClientSet mocks base method.
-func (m *MockClientCreator) CreateClientSet(token, url, cluster string) (kubernetes.Interface, error) {
+func (m *MockK8sClient) CreateClientSet(token, url, cluster string) (kubernetes.Interface, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateClientSet", token, url, cluster)
 	ret0, _ := ret[0].(kubernetes.Interface)
@@ -54,13 +55,28 @@ func (m *MockClientCreator) CreateClientSet(token, url, cluster string) (kuberne
 }
 
 // CreateClientSet indicates an expected call of CreateClientSet.
-func (mr *MockClientCreatorMockRecorder) CreateClientSet(token, url, cluster any) *gomock.Call {
+func (mr *MockK8sClientMockRecorder) CreateClientSet(token, url, cluster any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateClientSet", reflect.TypeOf((*MockClientCreator)(nil).CreateClientSet), token, url, cluster)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateClientSet", reflect.TypeOf((*MockK8sClient)(nil).CreateClientSet), token, url, cluster)
+}
+
+// GetResource mocks base method.
+func (m *MockK8sClient) GetResource(ctx context.Context, params k8s.GetParams) (*unstructured.Unstructured, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetResource", ctx, params)
+	ret0, _ := ret[0].(*unstructured.Unstructured)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetResource indicates an expected call of GetResource.
+func (mr *MockK8sClientMockRecorder) GetResource(ctx, params any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetResource", reflect.TypeOf((*MockK8sClient)(nil).GetResource), ctx, params)
 }
 
 // GetResourceInterface mocks base method.
-func (m *MockClientCreator) GetResourceInterface(token, url, namespace, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error) {
+func (m *MockK8sClient) GetResourceInterface(token, url, namespace, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetResourceInterface", token, url, namespace, cluster, gvr)
 	ret0, _ := ret[0].(dynamic.ResourceInterface)
@@ -69,61 +85,22 @@ func (m *MockClientCreator) GetResourceInterface(token, url, namespace, cluster 
 }
 
 // GetResourceInterface indicates an expected call of GetResourceInterface.
-func (mr *MockClientCreatorMockRecorder) GetResourceInterface(token, url, namespace, cluster, gvr any) *gomock.Call {
+func (mr *MockK8sClientMockRecorder) GetResourceInterface(token, url, namespace, cluster, gvr any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetResourceInterface", reflect.TypeOf((*MockClientCreator)(nil).GetResourceInterface), token, url, namespace, cluster, gvr)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetResourceInterface", reflect.TypeOf((*MockK8sClient)(nil).GetResourceInterface), token, url, namespace, cluster, gvr)
 }
 
-// MockResourceFetcher is a mock of ResourceFetcher interface.
-type MockResourceFetcher struct {
-	ctrl     *gomock.Controller
-	recorder *MockResourceFetcherMockRecorder
-	isgomock struct{}
-}
-
-// MockResourceFetcherMockRecorder is the mock recorder for MockResourceFetcher.
-type MockResourceFetcherMockRecorder struct {
-	mock *MockResourceFetcher
-}
-
-// NewMockResourceFetcher creates a new mock instance.
-func NewMockResourceFetcher(ctrl *gomock.Controller) *MockResourceFetcher {
-	mock := &MockResourceFetcher{ctrl: ctrl}
-	mock.recorder = &MockResourceFetcherMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockResourceFetcher) EXPECT() *MockResourceFetcherMockRecorder {
-	return m.recorder
-}
-
-// FetchK8sResource mocks base method.
-func (m *MockResourceFetcher) FetchK8sResource(params k8s.FetchParams) (*unstructured.Unstructured, error) {
+// GetResources mocks base method.
+func (m *MockK8sClient) GetResources(ctx context.Context, params k8s.ListParams) ([]*unstructured.Unstructured, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FetchK8sResource", params)
-	ret0, _ := ret[0].(*unstructured.Unstructured)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// FetchK8sResource indicates an expected call of FetchK8sResource.
-func (mr *MockResourceFetcherMockRecorder) FetchK8sResource(params any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FetchK8sResource", reflect.TypeOf((*MockResourceFetcher)(nil).FetchK8sResource), params)
-}
-
-// FetchK8sResources mocks base method.
-func (m *MockResourceFetcher) FetchK8sResources(params k8s.FetchParams) ([]*unstructured.Unstructured, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FetchK8sResources", params)
+	ret := m.ctrl.Call(m, "GetResources", ctx, params)
 	ret0, _ := ret[0].([]*unstructured.Unstructured)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// FetchK8sResources indicates an expected call of FetchK8sResources.
-func (mr *MockResourceFetcherMockRecorder) FetchK8sResources(params any) *gomock.Call {
+// GetResources indicates an expected call of GetResources.
+func (mr *MockK8sClientMockRecorder) GetResources(ctx, params any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FetchK8sResources", reflect.TypeOf((*MockResourceFetcher)(nil).FetchK8sResources), params)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetResources", reflect.TypeOf((*MockK8sClient)(nil).GetResources), ctx, params)
 }

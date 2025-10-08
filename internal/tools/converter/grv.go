@@ -27,4 +27,7 @@ var K8sKindsToGVRs = map[string]schema.GroupVersionResource{
 	"user":                    {Group: "management.cattle.io", Version: "v3", Resource: "users"},
 	"bundle":                  {Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "bundles"},
 	"gitrepo":                 {Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "gitrepos"},
+	"node":                    {Group: "", Version: "v1", Resource: "nodes"},
+	"node.metrics.k8s.io":     {Group: "metrics.k8s.io", Version: "v1beta1", Resource: "nodes"},
+	"pod.metrics.k8s.io":      {Group: "metrics.k8s.io", Version: "v1beta1", Resource: "pods"},
 }

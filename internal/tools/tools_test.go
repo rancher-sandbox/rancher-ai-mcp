@@ -4,18 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/fake"
-	"mcp/internal/tools/converter"
 	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/fake"
+	"mcp/internal/tools/converter"
 	"mcp/internal/tools/k8s"
 	"mcp/internal/tools/mocks"
 )
@@ -47,16 +47,16 @@ func TestGetKubernetesResource(t *testing.T) {
 	ctlr := gomock.NewController(t)
 
 	tests := map[string]struct {
-		params              ResourceParams
-		mockResourceFetcher func() ResourceFetcher
-		expectedResult      string
-		expectedError       string
+		params         ResourceParams
+		mockClient     func() K8sClient
+		expectedResult string
+		expectedError  string
 	}{
 		"get pod": {
 			params: ResourceParams{Name: "rancher", Kind: "pod", Namespace: "default", Cluster: "local"},
-			mockResourceFetcher: func() ResourceFetcher {
-				mock := mocks.NewMockResourceFetcher(ctlr)
-				mock.EXPECT().FetchK8sResource(k8s.FetchParams{
+			mockClient: func() K8sClient {
+				mock := mocks.NewMockK8sClient(ctlr)
+				mock.EXPECT().GetResource(context.TODO(), k8s.GetParams{
 					Cluster:   "local",
 					Kind:      "pod",
 					Namespace: "default",
@@ -71,9 +71,9 @@ func TestGetKubernetesResource(t *testing.T) {
 		},
 		"error fetching pod": {
 			params: ResourceParams{Name: "rancher", Kind: "pod", Namespace: "default", Cluster: "local"},
-			mockResourceFetcher: func() ResourceFetcher {
-				mock := mocks.NewMockResourceFetcher(ctlr)
-				mock.EXPECT().FetchK8sResource(k8s.FetchParams{
+			mockClient: func() K8sClient {
+				mock := mocks.NewMockK8sClient(ctlr)
+				mock.EXPECT().GetResource(context.TODO(), k8s.GetParams{
 					Cluster:   "local",
 					Kind:      "pod",
 					Namespace: "default",
@@ -91,7 +91,7 @@ func TestGetKubernetesResource(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 
-			tools := Tools{fetcher: test.mockResourceFetcher()}
+			tools := Tools{client: test.mockClient()}
 
 			result, _, err := tools.GetResource(context.TODO(), &mcp.CallToolRequest{
 				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}, tokenHeader: {fakeToken}}},
@@ -111,16 +111,16 @@ func TestListKubernetesResource(t *testing.T) {
 	ctlr := gomock.NewController(t)
 
 	tests := map[string]struct {
-		params              ListKubernetesResourcesParams
-		mockResourceFetcher func() ResourceFetcher
-		expectedResult      string
-		expectedError       string
+		params         ListKubernetesResourcesParams
+		mockClient     func() K8sClient
+		expectedResult string
+		expectedError  string
 	}{
 		"get pod list": {
 			params: ListKubernetesResourcesParams{Kind: "pod", Namespace: "default", Cluster: "local"},
-			mockResourceFetcher: func() ResourceFetcher {
-				mock := mocks.NewMockResourceFetcher(ctlr)
-				mock.EXPECT().FetchK8sResources(k8s.FetchParams{
+			mockClient: func() K8sClient {
+				mock := mocks.NewMockK8sClient(ctlr)
+				mock.EXPECT().GetResources(context.TODO(), k8s.ListParams{
 					Cluster:   "local",
 					Kind:      "pod",
 					Namespace: "default",
@@ -134,9 +134,9 @@ func TestListKubernetesResource(t *testing.T) {
 		},
 		"error fetching pod list": {
 			params: ListKubernetesResourcesParams{Kind: "pod", Namespace: "default", Cluster: "local"},
-			mockResourceFetcher: func() ResourceFetcher {
-				mock := mocks.NewMockResourceFetcher(ctlr)
-				mock.EXPECT().FetchK8sResources(k8s.FetchParams{
+			mockClient: func() K8sClient {
+				mock := mocks.NewMockK8sClient(ctlr)
+				mock.EXPECT().GetResources(context.TODO(), k8s.ListParams{
 					Cluster:   "local",
 					Kind:      "pod",
 					Namespace: "default",
@@ -153,7 +153,7 @@ func TestListKubernetesResource(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 
-			tools := Tools{fetcher: test.mockResourceFetcher()}
+			tools := Tools{client: test.mockClient()}
 
 			result, _, err := tools.ListKubernetesResources(context.TODO(), &mcp.CallToolRequest{
 				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}, tokenHeader: {fakeToken}}},
@@ -180,33 +180,33 @@ func TestUpdateKubernetesResource(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		params            UpdateKubernetesResourceParams
-		mockClientCreator func() ClientCreator
-		expectedResult    string
-		expectedError     string
+		params         UpdateKubernetesResourceParams
+		mockClient     func() K8sClient
+		expectedResult string
+		expectedError  string
 	}{
 		"patch pod": {
 			params: UpdateKubernetesResourceParams{Name: "rancher", Kind: "pod", Namespace: "default", Cluster: "local", Patch: patchData},
-			mockClientCreator: func() ClientCreator {
+			mockClient: func() K8sClient {
 				mockResourceInterface := mocks.NewMockResourceInterface(ctlr)
 				patchBytes, _ := json.Marshal(patchData)
 				mockResourceInterface.EXPECT().Patch(context.TODO(), "rancher", types.JSONPatchType, patchBytes, metav1.PatchOptions{}).Return(podUnstructured(), nil)
 
-				mockClientCreator := mocks.NewMockClientCreator(ctlr)
-				mockClientCreator.EXPECT().GetResourceInterface(fakeToken, fakeUrl, "default", "local", converter.K8sKindsToGVRs[strings.ToLower("pod")]).Return(mockResourceInterface, nil)
+				mockClient := mocks.NewMockK8sClient(ctlr)
+				mockClient.EXPECT().GetResourceInterface(fakeToken, fakeUrl, "default", "local", converter.K8sKindsToGVRs[strings.ToLower("pod")]).Return(mockResourceInterface, nil)
 
-				return mockClientCreator
+				return mockClient
 			},
 			expectedResult: `{"llm":"[{\"apiVersion\":\"v1\",\"kind\":\"Pod\",\"metadata\":{\"name\":\"rancher\"},\"spec\":{\"containers\":[{\"image\":\"rancher:latest\",\"name\":\"rancher-container\"}]}}]","uiContext":[{"namespace":"default","kind":"Pod","cluster":"local","name":"rancher","type":"pod"}]}`,
 		},
 		"error patching pod": {
 			params: UpdateKubernetesResourceParams{Name: "rancher", Kind: "pod", Namespace: "default", Cluster: "local", Patch: patchData},
-			mockClientCreator: func() ClientCreator {
+			mockClient: func() K8sClient {
 				mockResourceInterface := mocks.NewMockResourceInterface(ctlr)
 				patchBytes, _ := json.Marshal(patchData)
 				mockResourceInterface.EXPECT().Patch(context.TODO(), "rancher", types.JSONPatchType, patchBytes, metav1.PatchOptions{}).Return(nil, fmt.Errorf("unexpected error"))
 
-				mockClientCreator := mocks.NewMockClientCreator(ctlr)
+				mockClientCreator := mocks.NewMockK8sClient(ctlr)
 				mockClientCreator.EXPECT().GetResourceInterface(fakeToken, fakeUrl, "default", "local", converter.K8sKindsToGVRs[strings.ToLower("pod")]).Return(mockResourceInterface, nil)
 
 				return mockClientCreator
@@ -218,7 +218,7 @@ func TestUpdateKubernetesResource(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 
-			tools := Tools{client: test.mockClientCreator()}
+			tools := Tools{client: test.mockClient()}
 
 			result, _, err := tools.UpdateKubernetesResource(context.TODO(), &mcp.CallToolRequest{
 				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}, tokenHeader: {fakeToken}}},
@@ -238,10 +238,10 @@ func TestCreateKubernetesResource(t *testing.T) {
 	ctlr := gomock.NewController(t)
 
 	tests := map[string]struct {
-		params            CreateKubernetesResourceParams
-		mockClientCreator func() ClientCreator
-		expectedResult    string
-		expectedError     string
+		params         CreateKubernetesResourceParams
+		mockClient     func() K8sClient
+		expectedResult string
+		expectedError  string
 	}{
 		"create pod": {
 			params: CreateKubernetesResourceParams{
@@ -265,11 +265,11 @@ func TestCreateKubernetesResource(t *testing.T) {
 					},
 				},
 			},
-			mockClientCreator: func() ClientCreator {
+			mockClient: func() K8sClient {
 				mockResourceInterface := mocks.NewMockResourceInterface(ctlr)
 				mockResourceInterface.EXPECT().Create(context.TODO(), podUnstructured(), metav1.CreateOptions{}).Return(podUnstructured(), nil)
 
-				mockClientCreator := mocks.NewMockClientCreator(ctlr)
+				mockClientCreator := mocks.NewMockK8sClient(ctlr)
 				mockClientCreator.EXPECT().GetResourceInterface(fakeToken, fakeUrl, "default", "local", converter.K8sKindsToGVRs[strings.ToLower("pod")]).Return(mockResourceInterface, nil)
 
 				return mockClientCreator
@@ -299,11 +299,11 @@ func TestCreateKubernetesResource(t *testing.T) {
 					},
 				},
 			},
-			mockClientCreator: func() ClientCreator {
-				mockClientCreator := mocks.NewMockClientCreator(ctlr)
-				mockClientCreator.EXPECT().GetResourceInterface(fakeToken, fakeUrl, "default", "local", converter.K8sKindsToGVRs[strings.ToLower("pod")]).Return(nil, fmt.Errorf("unexpected error"))
+			mockClient: func() K8sClient {
+				mockClient := mocks.NewMockK8sClient(ctlr)
+				mockClient.EXPECT().GetResourceInterface(fakeToken, fakeUrl, "default", "local", converter.K8sKindsToGVRs[strings.ToLower("pod")]).Return(nil, fmt.Errorf("unexpected error"))
 
-				return mockClientCreator
+				return mockClient
 			},
 			expectedError: "unexpected error",
 		},
@@ -312,7 +312,7 @@ func TestCreateKubernetesResource(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 
-			tools := Tools{client: test.mockClientCreator()}
+			tools := Tools{client: test.mockClient()}
 
 			result, _, err := tools.CreateKubernetesResource(context.TODO(), &mcp.CallToolRequest{
 				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}, tokenHeader: {fakeToken}}},
@@ -332,20 +332,19 @@ func TestInspectPod(t *testing.T) {
 	ctlr := gomock.NewController(t)
 
 	tests := map[string]struct {
-		params              SpecificResourceParams
-		mockClientCreator   func() ClientCreator
-		mockResourceFetcher func() ResourceFetcher
-		expectedResult      string
-		expectedError       string
+		params         SpecificResourceParams
+		mockClient     func() K8sClient
+		expectedResult string
+		expectedError  string
 	}{
-		"create pod": {
+		"inspect pod": {
 			params: SpecificResourceParams{
 				Name:      "rancher",
 				Namespace: "default",
 				Cluster:   "local",
 			},
-			mockClientCreator: func() ClientCreator {
-				mock := mocks.NewMockClientCreator(ctlr)
+			mockClient: func() K8sClient {
+				mock := mocks.NewMockK8sClient(ctlr)
 				pod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "rancher",
@@ -353,12 +352,7 @@ func TestInspectPod(t *testing.T) {
 					},
 				}
 				mock.EXPECT().CreateClientSet(fakeToken, fakeUrl, "local").Return(fake.NewClientset(pod), nil)
-
-				return mock
-			},
-			mockResourceFetcher: func() ResourceFetcher {
-				mock := mocks.NewMockResourceFetcher(ctlr)
-				mock.EXPECT().FetchK8sResource(k8s.FetchParams{
+				mock.EXPECT().GetResource(context.TODO(), k8s.GetParams{
 					Cluster:   "local",
 					Kind:      "pod",
 					Namespace: "default",
@@ -388,7 +382,7 @@ func TestInspectPod(t *testing.T) {
 						},
 					},
 				}}, nil)
-				mock.EXPECT().FetchK8sResource(k8s.FetchParams{
+				mock.EXPECT().GetResource(context.TODO(), k8s.GetParams{
 					Cluster:   "local",
 					Kind:      "replicaset",
 					Namespace: "default",
@@ -410,7 +404,7 @@ func TestInspectPod(t *testing.T) {
 						},
 					},
 				}}, nil)
-				mock.EXPECT().FetchK8sResource(k8s.FetchParams{
+				mock.EXPECT().GetResource(context.TODO(), k8s.GetParams{
 					Cluster:   "local",
 					Kind:      "Deployment",
 					Namespace: "default",
@@ -424,9 +418,9 @@ func TestInspectPod(t *testing.T) {
 						"name": "rancher",
 					},
 				}}, nil)
-				mock.EXPECT().FetchK8sResource(k8s.FetchParams{
+				mock.EXPECT().GetResource(context.TODO(), k8s.GetParams{
 					Cluster:   "local",
-					Kind:      "metrics.k8s.io.pods",
+					Kind:      "pod.metrics.k8s.io",
 					Namespace: "default",
 					Name:      "rancher",
 					URL:       fakeUrl,
@@ -438,7 +432,6 @@ func TestInspectPod(t *testing.T) {
 						"name": "rancher",
 					},
 				}}, nil)
-
 				return mock
 			},
 
@@ -450,8 +443,7 @@ func TestInspectPod(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 
 			tools := Tools{
-				client:  test.mockClientCreator(),
-				fetcher: test.mockResourceFetcher(),
+				client: test.mockClient(),
 			}
 
 			result, _, err := tools.InspectPod(context.TODO(), &mcp.CallToolRequest{

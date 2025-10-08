@@ -81,35 +81,29 @@ type ContainerLogs struct {
 	Logs map[string]any `json:"logs"`
 }
 
-// ClientCreator defines an interface for creating Kubernetes clients.
-type ClientCreator interface {
+// K8sClient defines an interface for a Kubernetes client.
+type K8sClient interface {
 	GetResourceInterface(token string, url string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error)
 	CreateClientSet(token string, url string, cluster string) (kubernetes.Interface, error)
-}
-
-// ResourceFetcher defines an interface for fetching Kubernetes resources.
-type ResourceFetcher interface {
-	FetchK8sResource(params k8s.FetchParams) (*unstructured.Unstructured, error)
-	FetchK8sResources(params k8s.FetchParams) ([]*unstructured.Unstructured, error)
+	GetResource(ctx context.Context, params k8s.GetParams) (*unstructured.Unstructured, error)
+	GetResources(ctx context.Context, params k8s.ListParams) ([]*unstructured.Unstructured, error)
 }
 
 // Tools contains all tools for the MCP server
 type Tools struct {
-	fetcher ResourceFetcher
-	client  ClientCreator
+	client K8sClient
 }
 
 // NewTools creates and returns a new Tools instance.
 func NewTools() *Tools {
 	return &Tools{
-		fetcher: k8s.NewSteveFetcher(),
-		client:  k8s.NewClient(),
+		client: k8s.NewClient(),
 	}
 }
 
 // GetResource retrieves a specific Kubernetes resource based on the provided parameters.
-func (t *Tools) GetResource(_ context.Context, toolReq *mcp.CallToolRequest, params ResourceParams) (*mcp.CallToolResult, any, error) {
-	resource, err := t.fetcher.FetchK8sResource(k8s.FetchParams{
+func (t *Tools) GetResource(ctx context.Context, toolReq *mcp.CallToolRequest, params ResourceParams) (*mcp.CallToolResult, any, error) {
+	resource, err := t.client.GetResource(ctx, k8s.GetParams{
 		Cluster:   params.Cluster,
 		Kind:      params.Kind,
 		Namespace: params.Namespace,
@@ -132,8 +126,8 @@ func (t *Tools) GetResource(_ context.Context, toolReq *mcp.CallToolRequest, par
 }
 
 // ListKubernetesResources lists Kubernetes resources of a specific kind and namespace.
-func (t *Tools) ListKubernetesResources(_ context.Context, toolReq *mcp.CallToolRequest, params ListKubernetesResourcesParams) (*mcp.CallToolResult, any, error) {
-	resources, err := t.fetcher.FetchK8sResources(k8s.FetchParams{
+func (t *Tools) ListKubernetesResources(ctx context.Context, toolReq *mcp.CallToolRequest, params ListKubernetesResourcesParams) (*mcp.CallToolResult, any, error) {
+	resources, err := t.client.GetResources(ctx, k8s.ListParams{
 		Cluster:   params.Cluster,
 		Kind:      params.Kind,
 		Namespace: params.Namespace,
@@ -171,7 +165,7 @@ func (t *Tools) UpdateKubernetesResource(ctx context.Context, toolReq *mcp.CallT
 		return nil, nil, fmt.Errorf("failed to patch resource %s: %w", params.Name, err)
 	}
 
-	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{obj}, params.Namespace, params.Cluster) //string(respWithoutManagedFields)
+	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{obj}, params.Namespace, params.Cluster)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -215,7 +209,7 @@ func (t *Tools) CreateKubernetesResource(ctx context.Context, toolReq *mcp.CallT
 
 // InspectPod retrieves detailed information about a specific pod, its owner, metrics, and logs.
 func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, params SpecificResourceParams) (*mcp.CallToolResult, any, error) {
-	podResource, err := t.fetcher.FetchK8sResource(k8s.FetchParams{
+	podResource, err := t.client.GetResource(ctx, k8s.GetParams{
 		Cluster:   params.Cluster,
 		Kind:      "pod",
 		Namespace: params.Namespace,
@@ -240,7 +234,7 @@ func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 			break
 		}
 	}
-	replicaSetResource, err := t.fetcher.FetchK8sResource(k8s.FetchParams{
+	replicaSetResource, err := t.client.GetResource(ctx, k8s.GetParams{
 		Cluster:   params.Cluster,
 		Kind:      "replicaset",
 		Namespace: params.Namespace,
@@ -275,7 +269,7 @@ func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 			break
 		}
 	}
-	parentResource, err := t.fetcher.FetchK8sResource(k8s.FetchParams{
+	parentResource, err := t.client.GetResource(ctx, k8s.GetParams{
 		Cluster:   params.Cluster,
 		Kind:      parentKind,
 		Namespace: params.Namespace,
@@ -287,17 +281,15 @@ func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 		return nil, nil, err
 	}
 
-	podMetrics, err := t.fetcher.FetchK8sResource(k8s.FetchParams{
+	// ignore error as Metrics Server might not be installed in the cluster
+	podMetrics, _ := t.client.GetResource(ctx, k8s.GetParams{
 		Cluster:   params.Cluster,
-		Kind:      "metrics.k8s.io.pods",
+		Kind:      "pod.metrics.k8s.io",
 		Namespace: params.Namespace,
 		Name:      params.Name,
 		URL:       toolReq.Extra.Header.Get(urlHeader),
 		Token:     toolReq.Extra.Header.Get(tokenHeader),
 	})
-	if err != nil {
-		return nil, nil, err
-	}
 
 	logs, err := t.getPodLogs(ctx, toolReq.Extra.Header.Get(urlHeader), params.Cluster, toolReq.Extra.Header.Get(tokenHeader), pod)
 	if err != nil {
@@ -315,8 +307,8 @@ func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 }
 
 // GetDeploymentDetails retrieves details about a deployment and its associated pods.
-func (t *Tools) GetDeploymentDetails(_ context.Context, toolReq *mcp.CallToolRequest, params SpecificResourceParams) (*mcp.CallToolResult, any, error) {
-	deploymentResource, err := t.fetcher.FetchK8sResource(k8s.FetchParams{
+func (t *Tools) GetDeploymentDetails(ctx context.Context, toolReq *mcp.CallToolRequest, params SpecificResourceParams) (*mcp.CallToolResult, any, error) {
+	deploymentResource, err := t.client.GetResource(ctx, k8s.GetParams{
 		Cluster:   params.Cluster,
 		Kind:      "deployment",
 		Namespace: params.Namespace,
@@ -334,22 +326,21 @@ func (t *Tools) GetDeploymentDetails(_ context.Context, toolReq *mcp.CallToolReq
 	}
 
 	// find all pods for this deployment
-	filter := ""
-	for k, v := range deployment.Spec.Selector.MatchLabels {
-		filter = filter + "filter=metadata.labels." + k + "=" + v + "&"
+	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to convert label selector: %w", err)
 	}
-	filter = filter[:len(filter)-1]
-	pods, err := t.fetcher.FetchK8sResources(k8s.FetchParams{
-		Cluster:   params.Cluster,
-		Kind:      "deployment",
-		Namespace: params.Namespace,
-		Name:      params.Name,
-		URL:       toolReq.Extra.Header.Get(urlHeader),
-		Token:     toolReq.Extra.Header.Get(tokenHeader),
-		Filter:    filter,
+	pods, err := t.client.GetResources(ctx, k8s.ListParams{
+		Cluster:       params.Cluster,
+		Kind:          "pod",
+		Namespace:     params.Namespace,
+		Name:          params.Name,
+		URL:           toolReq.Extra.Header.Get(urlHeader),
+		Token:         toolReq.Extra.Header.Get(tokenHeader),
+		LabelSelector: selector.String(),
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed to get pods: %w", err)
 	}
 
 	mcpResponse, err := response.CreateMcpResponse(append([]*unstructured.Unstructured{deploymentResource}, pods...), params.Namespace, params.Cluster)
@@ -363,10 +354,10 @@ func (t *Tools) GetDeploymentDetails(_ context.Context, toolReq *mcp.CallToolReq
 }
 
 // GetNodes retrieves information and metrics for all nodes in a given cluster.
-func (t *Tools) GetNodes(_ context.Context, toolReq *mcp.CallToolRequest, params GetNodesParams) (*mcp.CallToolResult, any, error) {
-	nodeResource, err := t.fetcher.FetchK8sResources(k8s.FetchParams{
+func (t *Tools) GetNodes(ctx context.Context, toolReq *mcp.CallToolRequest, params GetNodesParams) (*mcp.CallToolResult, any, error) {
+	nodeResource, err := t.client.GetResources(ctx, k8s.ListParams{
 		Cluster: params.Cluster,
-		Kind:    "nodes",
+		Kind:    "node",
 		URL:     toolReq.Extra.Header.Get(urlHeader),
 		Token:   toolReq.Extra.Header.Get(tokenHeader),
 	})
@@ -374,15 +365,13 @@ func (t *Tools) GetNodes(_ context.Context, toolReq *mcp.CallToolRequest, params
 		return nil, nil, err
 	}
 
-	nodeMetricsResource, err := t.fetcher.FetchK8sResources(k8s.FetchParams{
+	// ignore error as Metrics Server might not be installed in the cluster
+	nodeMetricsResource, _ := t.client.GetResources(ctx, k8s.ListParams{
 		Cluster: params.Cluster,
-		Kind:    "metrics.k8s.io.nodes",
+		Kind:    "node.metrics.k8s.io",
 		URL:     toolReq.Extra.Header.Get(urlHeader),
 		Token:   toolReq.Extra.Header.Get(tokenHeader),
 	})
-	if err != nil {
-		return nil, nil, err
-	}
 
 	mcpResponse, err := response.CreateMcpResponse(append(nodeResource, nodeMetricsResource...), "", params.Cluster)
 	if err != nil {
