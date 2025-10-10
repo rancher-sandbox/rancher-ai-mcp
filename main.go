@@ -75,15 +75,28 @@ func main() {
 		cluster (string): The name of the Kubernetes cluster.`},
 		tools.GetNodes)
 	mcp.AddTool(server, &mcp.Tool{
-		Name: "createKubernetesResource",
-		Description: `Returns a list of all nodes in a specified Kubernetes cluster, including their current resource utilization metrics.'
+		Name: "createKubernetesResources",
+		Description: `Description: Creates kubernetes resources in a cluster'
 		Parameters:
-		kind (string): The type of Kubernetes resource to patch (e.g., Pod, Deployment, Service).
-		namespace (string): The namespace where the resource is located. It must be empty for cluster-wide resources.
-		name (string): The name of the specific resource to patch.
+        - resources (array): each resource contains:
+			kind (string): The type of Kubernetes resource to patch (e.g., Pod, Deployment, Service).
+			namespace (string): The namespace where the resource is located. It must be empty for cluster-wide resources.
+			name (string): The name of the specific resource to patch.
+			cluster (string): The name of the Kubernetes cluster. Empty for single container pods.
+			resource (json): Resource to be created. This must be a JSON object.`},
+		tools.CreateKubernetesResources)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "grantOrVerifyResourceAccess",
+		Description: `This tool checks whether a user has sufficient permissions to access a Kubernetes resource. Only a group or a user must be specified.
+		Parameters:
+		namespace (string): The namespace where the resource is located. It must be empty for all namespaces or cluster-wide resources.
 		cluster (string): The name of the Kubernetes cluster. Empty for single container pods.
-		resource (json): Resource to be created. This must be a JSON object.`},
-		tools.CreateKubernetesResource)
+		user (string): The user to check permissions for.
+		group (string): The group to check permissions for.
+		project (string): The project where permissions are granted. Optional. Empty if permissions are granted to a cluster.
+		grant (bool): True if the user is asking to grant permissions. False only for checking permissions.
+		rules (k8s rules): Kubernetes rules`},
+		tools.GrantOrVerifyResourceAccess)
 
 	handler := mcp.NewStreamableHTTPHandler(func(request *http.Request) *mcp.Server {
 		return server
