@@ -300,7 +300,12 @@ func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 		return nil, nil, err
 	}
 
-	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{podResource, parentResource, podMetrics, logs}, params.Cluster)
+	resources := []*unstructured.Unstructured{podResource, parentResource, logs}
+	if podMetrics != nil {
+		resources = append(resources, podMetrics)
+	}
+
+	mcpResponse, err := response.CreateMcpResponse(resources, params.Cluster)
 	if err != nil {
 		return nil, nil, err
 	}
