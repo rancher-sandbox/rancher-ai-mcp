@@ -84,6 +84,12 @@ func main() {
 		cluster (string): The name of the Kubernetes cluster. Empty for single container pods.
 		resource (json): Resource to be created. This must be a JSON object.`},
 		tools.CreateKubernetesResource)
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "getClusterImages",
+		Description: `Returns a list of all container images for the specified clusters.'
+		Parameters:
+		clusters (array of strings): List of clusters to get images from. Empty for return images for all clusters.`},
+		tools.GetClusterImages)
 
 	handler := mcp.NewStreamableHTTPHandler(func(request *http.Request) *mcp.Server {
 		return server
