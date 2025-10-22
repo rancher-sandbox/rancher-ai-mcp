@@ -33,7 +33,7 @@ type MCPResponse struct {
 
 // CreateMcpResponse constructs an MCPResponse object. It takes a slice of unstructured Kubernetes objects, namespace, kind, cluster,
 // and optional additional information strings. It marshals the response into a JSON string.
-func CreateMcpResponse(objs []*unstructured.Unstructured, namespace string, cluster string) (string, error) {
+func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string) (string, error) {
 	var uiContext []UIContext
 	for _, obj := range objs {
 		// Remove managedFields from each object to reduce payload size and remove irrelevant data for the LLM.
@@ -44,7 +44,7 @@ func CreateMcpResponse(objs []*unstructured.Unstructured, namespace string, clus
 			steveType = gvr.Group + "." + lowerKind
 		}
 		uiContext = append(uiContext, UIContext{
-			Namespace: namespace,
+			Namespace: obj.GetNamespace(),
 			Kind:      obj.GetKind(),
 			Cluster:   cluster,
 			Name:      obj.GetName(),
@@ -74,6 +74,9 @@ func CreateMcpResponse(objs []*unstructured.Unstructured, namespace string, clus
 }
 
 func removeManagedFieldsIfPresent(obj *unstructured.Unstructured) {
+	if obj == nil || obj.Object == nil {
+		return
+	}
 	metadata, ok := obj.Object["metadata"].(map[string]interface{})
 	if !ok {
 		// nothing to do

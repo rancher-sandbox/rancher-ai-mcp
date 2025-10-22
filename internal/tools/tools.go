@@ -76,6 +76,10 @@ type SpecificResourceParams struct {
 	Cluster   string `json:"cluster" jsonschema:"the cluster of the resource"`
 }
 
+type GetClusterImagesParams struct {
+	Clusters []string `json:"clusters" jsonschema:"the clusters where images are returned"`
+}
+
 // ContainerLogs holds logs for multiple containers.
 type ContainerLogs struct {
 	Logs map[string]any `json:"logs"`
@@ -115,7 +119,7 @@ func (t *Tools) GetResource(ctx context.Context, toolReq *mcp.CallToolRequest, p
 		return nil, nil, err
 	}
 
-	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{resource}, params.Namespace, params.Cluster)
+	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{resource}, params.Cluster)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -138,7 +142,7 @@ func (t *Tools) ListKubernetesResources(ctx context.Context, toolReq *mcp.CallTo
 		return nil, nil, err
 	}
 
-	mcpResponse, err := response.CreateMcpResponse(resources, params.Namespace, params.Cluster)
+	mcpResponse, err := response.CreateMcpResponse(resources, params.Cluster)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -165,7 +169,7 @@ func (t *Tools) UpdateKubernetesResource(ctx context.Context, toolReq *mcp.CallT
 		return nil, nil, fmt.Errorf("failed to patch resource %s: %w", params.Name, err)
 	}
 
-	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{obj}, params.Namespace, params.Cluster)
+	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{obj}, params.Cluster)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -197,7 +201,7 @@ func (t *Tools) CreateKubernetesResource(ctx context.Context, toolReq *mcp.CallT
 		return nil, nil, fmt.Errorf("failed to create resource %s: %w", params.Name, err)
 	}
 
-	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{obj}, params.Namespace, params.Cluster) //string(respWithoutManagedFields)
+	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{obj}, params.Cluster) //string(respWithoutManagedFields)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -296,7 +300,7 @@ func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 		return nil, nil, err
 	}
 
-	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{podResource, parentResource, podMetrics, logs}, params.Namespace, params.Cluster)
+	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{podResource, parentResource, podMetrics, logs}, params.Cluster)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -343,7 +347,7 @@ func (t *Tools) GetDeploymentDetails(ctx context.Context, toolReq *mcp.CallToolR
 		return nil, nil, fmt.Errorf("failed to get pods: %w", err)
 	}
 
-	mcpResponse, err := response.CreateMcpResponse(append([]*unstructured.Unstructured{deploymentResource}, pods...), params.Namespace, params.Cluster)
+	mcpResponse, err := response.CreateMcpResponse(append([]*unstructured.Unstructured{deploymentResource}, pods...), params.Cluster)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -373,7 +377,7 @@ func (t *Tools) GetNodes(ctx context.Context, toolReq *mcp.CallToolRequest, para
 		Token:   toolReq.Extra.Header.Get(tokenHeader),
 	})
 
-	mcpResponse, err := response.CreateMcpResponse(append(nodeResource, nodeMetricsResource...), "", params.Cluster)
+	mcpResponse, err := response.CreateMcpResponse(append(nodeResource, nodeMetricsResource...), params.Cluster)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -381,6 +385,60 @@ func (t *Tools) GetNodes(ctx context.Context, toolReq *mcp.CallToolRequest, para
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: mcpResponse}},
 	}, nil, nil
+}
+
+func (t *Tools) GetClusterImages(ctx context.Context, toolReq *mcp.CallToolRequest, params GetClusterImagesParams) (*mcp.CallToolResult, any, error) {
+	var clusters []string
+	if len(params.Clusters) == 0 {
+		clusterList, err := t.client.GetResources(ctx, k8s.ListParams{
+			Cluster: "local",
+			Kind:    "cluster",
+			URL:     toolReq.Extra.Header.Get(urlHeader),
+			Token:   toolReq.Extra.Header.Get(tokenHeader),
+		})
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get clusters: %w", err)
+		}
+		for _, cluster := range clusterList {
+			clusters = append(clusters, cluster.GetName())
+		}
+	} else {
+		clusters = params.Clusters
+	}
+
+	imagesInClusters := map[string][]string{}
+
+	for _, cluster := range clusters {
+		var images []string
+		clientset, err := t.client.CreateClientSet(toolReq.Extra.Header.Get(tokenHeader), toolReq.Extra.Header.Get(urlHeader), cluster)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create clientset: %w", err)
+		}
+		pods, err := clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get pods: %w", err)
+		}
+		for _, pod := range pods.Items {
+			for _, container := range pod.Spec.InitContainers {
+				images = append(images, container.Image)
+			}
+			for _, container := range pod.Spec.Containers {
+				images = append(images, container.Image)
+			}
+		}
+
+		imagesInClusters[cluster] = images
+	}
+
+	response, err := json.Marshal(imagesInClusters)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marsha JSON: %w", err)
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: string(response)}},
+	}, nil, nil
+
 }
 
 func (t *Tools) getPodLogs(ctx context.Context, url string, cluster string, token string, pod corev1.Pod) (*unstructured.Unstructured, error) {
