@@ -26,7 +26,7 @@ type UIContext struct {
 // MCPResponse represents the response returned by the MCP server
 type MCPResponse struct {
 	// LLM response to be sent to the LLM
-	LLM string `json:"llm"`
+	LLM any `json:"llm"`
 	// UIContext contains a list of resources so the UI can generate links to them
 	UIContext []UIContext `json:"uiContext,omitempty"`
 }
@@ -52,19 +52,15 @@ func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string) (strin
 		})
 	}
 
-	llmResponse := "no resources found"
-	if len(objs) > 0 {
-		llmResponseBytes, err := json.Marshal(objs)
-		if err != nil {
-			return "", err
-		}
-		llmResponse = string(llmResponseBytes)
-	}
-
 	resp := MCPResponse{
-		LLM:       llmResponse,
 		UIContext: uiContext,
 	}
+	if len(objs) > 0 {
+		resp.LLM = objs
+	} else {
+		resp.LLM = "no resources found"
+	}
+
 	bytes, err := json.Marshal(resp)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal response: %w", err)

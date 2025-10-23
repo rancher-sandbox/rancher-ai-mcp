@@ -30,6 +30,27 @@ const (
 	podLogsTailLines = 50
 )
 
+// GetParams holds the parameters required to get a resource from k8s.
+type GetParams struct {
+	Cluster   string // The Cluster ID.
+	Kind      string // The Kind of the Kubernetes resource (e.g., "pod", "deployment").
+	Namespace string // The Namespace of the resource (optional).
+	Name      string // The Name of the resource (optional).
+	URL       string // The base URL of the Rancher server.
+	Token     string // The authentication Token for Steve.
+}
+
+// ListParams holds the parameters required to list resources from k8s.
+type ListParams struct {
+	Cluster       string // The Cluster ID.
+	Kind          string // The Kind of the Kubernetes resource (e.g., "pod", "deployment").
+	Namespace     string // The Namespace of the resource (optional).
+	Name          string // The Name of the resource (optional).
+	URL           string // The base URL of the Rancher server.
+	Token         string // The authentication Token for Steve.
+	LabelSelector string // Optional LabelSelector string for the request.
+}
+
 // ResourceParams uniquely identifies a specific named resource within a cluster.
 type ResourceParams struct {
 	Name      string `json:"name" jsonschema:"the name of k8s resource"`
@@ -89,8 +110,6 @@ type ContainerLogs struct {
 type K8sClient interface {
 	GetResourceInterface(token string, url string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error)
 	CreateClientSet(token string, url string, cluster string) (kubernetes.Interface, error)
-	GetResource(ctx context.Context, params k8s.GetParams) (*unstructured.Unstructured, error)
-	GetResources(ctx context.Context, params k8s.ListParams) ([]*unstructured.Unstructured, error)
 }
 
 // Tools contains all tools for the MCP server
@@ -107,7 +126,7 @@ func NewTools() *Tools {
 
 // GetResource retrieves a specific Kubernetes resource based on the provided parameters.
 func (t *Tools) GetResource(ctx context.Context, toolReq *mcp.CallToolRequest, params ResourceParams) (*mcp.CallToolResult, any, error) {
-	resource, err := t.client.GetResource(ctx, k8s.GetParams{
+	resource, err := t.getResource(ctx, GetParams{
 		Cluster:   params.Cluster,
 		Kind:      params.Kind,
 		Namespace: params.Namespace,
@@ -131,7 +150,7 @@ func (t *Tools) GetResource(ctx context.Context, toolReq *mcp.CallToolRequest, p
 
 // ListKubernetesResources lists Kubernetes resources of a specific kind and namespace.
 func (t *Tools) ListKubernetesResources(ctx context.Context, toolReq *mcp.CallToolRequest, params ListKubernetesResourcesParams) (*mcp.CallToolResult, any, error) {
-	resources, err := t.client.GetResources(ctx, k8s.ListParams{
+	resources, err := t.getResources(ctx, ListParams{
 		Cluster:   params.Cluster,
 		Kind:      params.Kind,
 		Namespace: params.Namespace,
@@ -213,7 +232,7 @@ func (t *Tools) CreateKubernetesResource(ctx context.Context, toolReq *mcp.CallT
 
 // InspectPod retrieves detailed information about a specific pod, its owner, metrics, and logs.
 func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, params SpecificResourceParams) (*mcp.CallToolResult, any, error) {
-	podResource, err := t.client.GetResource(ctx, k8s.GetParams{
+	podResource, err := t.getResource(ctx, GetParams{
 		Cluster:   params.Cluster,
 		Kind:      "pod",
 		Namespace: params.Namespace,
@@ -238,7 +257,7 @@ func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 			break
 		}
 	}
-	replicaSetResource, err := t.client.GetResource(ctx, k8s.GetParams{
+	replicaSetResource, err := t.getResource(ctx, GetParams{
 		Cluster:   params.Cluster,
 		Kind:      "replicaset",
 		Namespace: params.Namespace,
@@ -273,7 +292,7 @@ func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 			break
 		}
 	}
-	parentResource, err := t.client.GetResource(ctx, k8s.GetParams{
+	parentResource, err := t.getResource(ctx, GetParams{
 		Cluster:   params.Cluster,
 		Kind:      parentKind,
 		Namespace: params.Namespace,
@@ -286,7 +305,7 @@ func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 	}
 
 	// ignore error as Metrics Server might not be installed in the cluster
-	podMetrics, _ := t.client.GetResource(ctx, k8s.GetParams{
+	podMetrics, _ := t.getResource(ctx, GetParams{
 		Cluster:   params.Cluster,
 		Kind:      "pod.metrics.k8s.io",
 		Namespace: params.Namespace,
@@ -317,7 +336,7 @@ func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 
 // GetDeploymentDetails retrieves details about a deployment and its associated pods.
 func (t *Tools) GetDeploymentDetails(ctx context.Context, toolReq *mcp.CallToolRequest, params SpecificResourceParams) (*mcp.CallToolResult, any, error) {
-	deploymentResource, err := t.client.GetResource(ctx, k8s.GetParams{
+	deploymentResource, err := t.getResource(ctx, GetParams{
 		Cluster:   params.Cluster,
 		Kind:      "deployment",
 		Namespace: params.Namespace,
@@ -339,7 +358,7 @@ func (t *Tools) GetDeploymentDetails(ctx context.Context, toolReq *mcp.CallToolR
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to convert label selector: %w", err)
 	}
-	pods, err := t.client.GetResources(ctx, k8s.ListParams{
+	pods, err := t.getResources(ctx, ListParams{
 		Cluster:       params.Cluster,
 		Kind:          "pod",
 		Namespace:     params.Namespace,
@@ -364,7 +383,7 @@ func (t *Tools) GetDeploymentDetails(ctx context.Context, toolReq *mcp.CallToolR
 
 // GetNodes retrieves information and metrics for all nodes in a given cluster.
 func (t *Tools) GetNodes(ctx context.Context, toolReq *mcp.CallToolRequest, params GetNodesParams) (*mcp.CallToolResult, any, error) {
-	nodeResource, err := t.client.GetResources(ctx, k8s.ListParams{
+	nodeResource, err := t.getResources(ctx, ListParams{
 		Cluster: params.Cluster,
 		Kind:    "node",
 		URL:     toolReq.Extra.Header.Get(urlHeader),
@@ -375,7 +394,7 @@ func (t *Tools) GetNodes(ctx context.Context, toolReq *mcp.CallToolRequest, para
 	}
 
 	// ignore error as Metrics Server might not be installed in the cluster
-	nodeMetricsResource, _ := t.client.GetResources(ctx, k8s.ListParams{
+	nodeMetricsResource, _ := t.getResources(ctx, ListParams{
 		Cluster: params.Cluster,
 		Kind:    "node.metrics.k8s.io",
 		URL:     toolReq.Extra.Header.Get(urlHeader),
@@ -395,7 +414,7 @@ func (t *Tools) GetNodes(ctx context.Context, toolReq *mcp.CallToolRequest, para
 func (t *Tools) GetClusterImages(ctx context.Context, toolReq *mcp.CallToolRequest, params GetClusterImagesParams) (*mcp.CallToolResult, any, error) {
 	var clusters []string
 	if len(params.Clusters) == 0 {
-		clusterList, err := t.client.GetResources(ctx, k8s.ListParams{
+		clusterList, err := t.getResources(ctx, ListParams{
 			Cluster: "local",
 			Kind:    "cluster",
 			URL:     toolReq.Extra.Header.Get(urlHeader),
@@ -476,4 +495,41 @@ func (t *Tools) getPodLogs(ctx context.Context, url string, cluster string, toke
 	}
 
 	return &unstructured.Unstructured{Object: map[string]interface{}{"pod-logs": logs.Logs}}, nil
+}
+
+func (t *Tools) getResource(ctx context.Context, params GetParams) (*unstructured.Unstructured, error) {
+	resourceInterface, err := t.client.GetResourceInterface(params.Token, params.URL, params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
+	if err != nil {
+		return nil, err
+	}
+
+	obj, err := resourceInterface.Get(ctx, params.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	return obj, err
+}
+
+func (t *Tools) getResources(ctx context.Context, params ListParams) ([]*unstructured.Unstructured, error) {
+	resourceInterface, err := t.client.GetResourceInterface(params.Token, params.URL, params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
+	if err != nil {
+		return nil, err
+	}
+
+	opts := metav1.ListOptions{}
+	if params.LabelSelector != "" {
+		opts.LabelSelector = params.LabelSelector
+	}
+	list, err := resourceInterface.List(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	objs := make([]*unstructured.Unstructured, len(list.Items))
+	for i := range list.Items {
+		objs[i] = &list.Items[i]
+	}
+
+	return objs, err
 }

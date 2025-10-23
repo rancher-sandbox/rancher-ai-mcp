@@ -21,14 +21,7 @@ func main() {
 		namespace (string, optional): The namespace of the resource. This parameter is required for all namespaced resources (e.g., Pods, Deployments). It should be an empty string for cluster-scoped resources (e.g., 'Node', 'ClusterRole').
 		
 		Returns:
-		The JSON representation of the requested Kubernetes resource.
-		
-		Examples:
-		To get the my-pod in the default namespace in the local cluster:
-		getKubernetesResource(name='my-pod', kind='Pod', namespace='default', cluster='local')
-		
-		To get the node-1 node (a cluster-scoped resource) in the local cluster:
-		getKubernetesResource(name='node-1', kind='Node', namespace=''), cluster='local'`},
+		The JSON representation of the requested Kubernetes resource.`},
 		tools.GetResource)
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "patchKubernetesResource",
@@ -42,7 +35,7 @@ func main() {
 		Returns the modified resource.
 		
 		Example of the patch parameter:
-		[{\"op\": \"replace\", \"path\": \"/spec/replicas\", \"value\": 3}]`},
+		[{"op": "replace", "path": "/spec/replicas", "value": 3}]`},
 		tools.UpdateKubernetesResource)
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "listKubernetesResources",

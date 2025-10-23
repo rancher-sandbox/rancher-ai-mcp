@@ -1,39 +1,13 @@
 package k8s
 
 import (
-	"context"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"mcp/internal/tools/converter"
-	"strings"
 )
-
-// GetParams holds the parameters required to get a resource from k8s.
-type GetParams struct {
-	Cluster   string // The Cluster ID.
-	Kind      string // The Kind of the Kubernetes resource (e.g., "pod", "deployment").
-	Namespace string // The Namespace of the resource (optional).
-	Name      string // The Name of the resource (optional).
-	URL       string // The base URL of the Rancher server.
-	Token     string // The authentication Token for Steve.
-}
-
-// ListParams holds the parameters required to list resources from k8s.
-type ListParams struct {
-	Cluster       string // The Cluster ID.
-	Kind          string // The Kind of the Kubernetes resource (e.g., "pod", "deployment").
-	Namespace     string // The Namespace of the resource (optional).
-	Name          string // The Name of the resource (optional).
-	URL           string // The base URL of the Rancher server.
-	Token         string // The authentication Token for Steve.
-	LabelSelector string // Optional LabelSelector string for the request.
-}
 
 // Client is a struct that provides methods for interacting with Kubernetes clusters.
 type Client struct{}
@@ -69,44 +43,6 @@ func (c *Client) GetResourceInterface(token string, url string, namespace string
 	}
 
 	return resourceInterface, nil
-}
-
-func (c *Client) GetResource(ctx context.Context, params GetParams) (*unstructured.Unstructured, error) {
-	resourceInterface, err := c.GetResourceInterface(params.Token, params.URL, params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
-	if err != nil {
-		return nil, err
-	}
-
-	obj, err := resourceInterface.Get(ctx, params.Name, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	return obj, err
-}
-
-func (c *Client) GetResources(ctx context.Context, params ListParams) ([]*unstructured.Unstructured, error) {
-	resourceInterface, err := c.GetResourceInterface(params.Token, params.URL, params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
-	if err != nil {
-		return nil, err
-	}
-
-	opts := metav1.ListOptions{}
-	if params.LabelSelector != "" {
-		opts.LabelSelector = params.LabelSelector
-	}
-	list, err := resourceInterface.List(ctx, opts)
-	if err != nil {
-		return nil, err
-	}
-
-	objs := make([]*unstructured.Unstructured, len(list.Items))
-	for i := range list.Items {
-		objs[i] = &list.Items[i]
-	}
-
-	return objs, err
-
 }
 
 // createRestConfig creates a new rest.Config for the given Token and URL.
