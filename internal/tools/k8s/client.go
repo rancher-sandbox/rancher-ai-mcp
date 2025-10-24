@@ -7,7 +7,10 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"os"
 )
+
+const skipTLSVerifyEnvVar = "INSECURE_SKIP_TLS"
 
 // Client is a struct that provides methods for interacting with Kubernetes clusters.
 type Client struct{}
@@ -50,7 +53,8 @@ func createRestConfig(token string, url string, cluster string) (*rest.Config, e
 	clusterURL := url + "/k8s/clusters/" + cluster
 	kubeconfig := clientcmdapi.NewConfig()
 	kubeconfig.Clusters["Cluster"] = &clientcmdapi.Cluster{
-		Server: clusterURL,
+		Server:                clusterURL,
+		InsecureSkipTLSVerify: os.Getenv(skipTLSVerifyEnvVar) == "true",
 	}
 	kubeconfig.AuthInfos["mcp"] = &clientcmdapi.AuthInfo{
 		Token: token,
