@@ -18,7 +18,7 @@ func main() {
 		name (string, required): The name of the Kubernetes resource.
 		kind (string, required): The kind of the Kubernetes resource (e.g. 'Deployment', 'Service').
 		cluster (string): The name of the Kubernetes cluster managed by Rancher.
-		namespace (string, optional): The namespace of the resource. This parameter is required for all namespaced resources (e.g., Pods, Deployments). It should be an empty string for cluster-scoped resources (e.g., 'Node', 'ClusterRole').
+		namespace (string, optional): The namespace of the resource. It must be empty for all namespaces or cluster-wide resources.
 		
 		Returns:
 		The JSON representation of the requested Kubernetes resource.`},
@@ -42,7 +42,7 @@ func main() {
 		Description: `Returns a list of kubernetes resources.'
 		Parameters:
 		kind (string): The type of Kubernetes resource to patch (e.g., Pod, Deployment, Service).
-		namespace (string): The namespace where the resource are located. It must be empty for cluster-wide resources.
+		namespace (string): The namespace where the resource are located. It must be empty for all namespaces or cluster-wide resources.
 		cluster (string): The name of the Kubernetes cluster.`},
 		tools.ListKubernetesResources)
 	mcp.AddTool(server, &mcp.Tool{
