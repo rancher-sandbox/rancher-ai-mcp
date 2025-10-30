@@ -28,7 +28,7 @@ func main() {
 	tools := tools.NewTools()
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "getKubernetesResource",
-		Description: `Fetches a Kubernetes resource from the cluster. Use this tool to retrieve the YAML or JSON representation of any Kubernetes object.
+		Description: `Fetches a Kubernetes resource from the cluster.
 		Parameters:
 		name (string, required): The name of the Kubernetes resource.
 		kind (string, required): The kind of the Kubernetes resource (e.g. 'Deployment', 'Service').
@@ -62,7 +62,7 @@ func main() {
 		tools.ListKubernetesResources)
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "inspectPod",
-		Description: `Description: Returns all information related to a Pod. It includes its parent Deployment or StatefulSet, the CPU and memory consumption and the logs. It must be used for troubleshooting problems with pods.'
+		Description: `Returns all information related to a Pod. It includes its parent Deployment or StatefulSet, the CPU and memory consumption and the logs. It must be used for troubleshooting problems with pods.'
 		Parameters:
 		namespace (string): The namespace where the resource are located.
 		cluster (string): The name of the Kubernetes cluster.
@@ -70,7 +70,7 @@ func main() {
 		tools.InspectPod)
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "getDeployment",
-		Description: `Description: Returns a Deployment and its Pods. It must be used for troubleshooting problems with deployments.'
+		Description: `Returns a Deployment and its Pods. It must be used for troubleshooting problems with deployments.'
 		Parameters:
 		namespace (string): The namespace where the resource are located.
 		cluster (string): The name of the Kubernetes cluster.
@@ -84,7 +84,7 @@ func main() {
 		tools.GetNodes)
 	mcp.AddTool(server, &mcp.Tool{
 		Name: "createKubernetesResource",
-		Description: `Returns a list of all nodes in a specified Kubernetes cluster, including their current resource utilization metrics.'
+		Description: `Creates a resource in a kubernetes cluster.'
 		Parameters:
 		kind (string): The type of Kubernetes resource to patch (e.g., Pod, Deployment, Service).
 		namespace (string): The namespace where the resource is located. It must be empty for cluster-wide resources.
