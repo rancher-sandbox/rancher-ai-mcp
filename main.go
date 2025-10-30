@@ -8,6 +8,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"mcp/internal/tools"
 )
 
@@ -15,7 +16,10 @@ func init() {
 	if strings.ToLower(os.Getenv("LOG_LEVEL")) == "debug" {
 		zap.ReplaceGlobals(zap.Must(zap.NewDevelopment()))
 	} else {
-		zap.ReplaceGlobals(zap.Must(zap.NewProduction()))
+		config := zap.NewProductionConfig()
+		// remove the "caller" key from the log output
+		config.EncoderConfig.CallerKey = zapcore.OmitKey
+		zap.ReplaceGlobals(zap.Must(config.Build()))
 	}
 }
 
