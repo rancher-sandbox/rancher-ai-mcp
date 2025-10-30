@@ -2,11 +2,22 @@ package main
 
 import (
 	"log"
-	"mcp/internal/tools"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"go.uber.org/zap"
+	"mcp/internal/tools"
 )
+
+func init() {
+	if strings.ToLower(os.Getenv("LOG_LEVEL")) == "debug" {
+		zap.ReplaceGlobals(zap.Must(zap.NewDevelopment()))
+	} else {
+		zap.ReplaceGlobals(zap.Must(zap.NewProduction()))
+	}
+}
 
 func main() {
 	server := mcp.NewServer(&mcp.Implementation{Name: "pod finder", Version: "v1.0.0"}, nil)
@@ -88,6 +99,6 @@ func main() {
 		return server
 	}, &mcp.StreamableHTTPOptions{})
 
-	log.Println("Listening on :9092")
+	zap.L().Info("MCP Server started!")
 	log.Fatal(http.ListenAndServe(":9092", handler))
 }

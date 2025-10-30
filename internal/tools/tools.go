@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"go.uber.org/zap"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -126,6 +127,8 @@ func NewTools() *Tools {
 
 // GetResource retrieves a specific Kubernetes resource based on the provided parameters.
 func (t *Tools) GetResource(ctx context.Context, toolReq *mcp.CallToolRequest, params ResourceParams) (*mcp.CallToolResult, any, error) {
+	zap.L().Debug("getKubernetesResource called")
+
 	resource, err := t.getResource(ctx, GetParams{
 		Cluster:   params.Cluster,
 		Kind:      params.Kind,
@@ -135,11 +138,13 @@ func (t *Tools) GetResource(ctx context.Context, toolReq *mcp.CallToolRequest, p
 		Token:     toolReq.Extra.Header.Get(tokenHeader),
 	})
 	if err != nil {
+		zap.L().Error("failed to get resource", zap.String("tool", "getKubernetesResource"), zap.Error(err))
 		return nil, nil, err
 	}
 
 	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{resource}, params.Cluster)
 	if err != nil {
+		zap.L().Error("failed to create mcp response", zap.String("tool", "listKubernetesResource"), zap.Error(err))
 		return nil, nil, err
 	}
 
@@ -150,6 +155,8 @@ func (t *Tools) GetResource(ctx context.Context, toolReq *mcp.CallToolRequest, p
 
 // ListKubernetesResources lists Kubernetes resources of a specific kind and namespace.
 func (t *Tools) ListKubernetesResources(ctx context.Context, toolReq *mcp.CallToolRequest, params ListKubernetesResourcesParams) (*mcp.CallToolResult, any, error) {
+	zap.L().Debug("listKubernetesResource called")
+
 	resources, err := t.getResources(ctx, ListParams{
 		Cluster:   params.Cluster,
 		Kind:      params.Kind,
@@ -158,11 +165,13 @@ func (t *Tools) ListKubernetesResources(ctx context.Context, toolReq *mcp.CallTo
 		Token:     toolReq.Extra.Header.Get(tokenHeader),
 	})
 	if err != nil {
+		zap.L().Error("failed to list resources", zap.String("tool", "listKubernetesResource"), zap.Error(err))
 		return nil, nil, err
 	}
 
 	mcpResponse, err := response.CreateMcpResponse(resources, params.Cluster)
 	if err != nil {
+		zap.L().Error("failed to create mcp response", zap.String("tool", "listKubernetesResource"), zap.Error(err))
 		return nil, nil, err
 	}
 
@@ -173,6 +182,8 @@ func (t *Tools) ListKubernetesResources(ctx context.Context, toolReq *mcp.CallTo
 
 // UpdateKubernetesResource updates a specific Kubernetes resource using a JSON patch.
 func (t *Tools) UpdateKubernetesResource(ctx context.Context, toolReq *mcp.CallToolRequest, params UpdateKubernetesResourceParams) (*mcp.CallToolResult, any, error) {
+	zap.L().Debug("updateKubernetesResource called")
+
 	resourceInterface, err := t.client.GetResourceInterface(toolReq.Extra.Header.Get(tokenHeader), toolReq.Extra.Header.Get(urlHeader), params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
 	if err != nil {
 		return nil, nil, err
@@ -180,16 +191,19 @@ func (t *Tools) UpdateKubernetesResource(ctx context.Context, toolReq *mcp.CallT
 
 	patchBytes, err := json.Marshal(params.Patch)
 	if err != nil {
+		zap.L().Error("failed to create patch", zap.String("tool", "updateKubernetesResource"), zap.Error(err))
 		return nil, nil, fmt.Errorf("failed to marshal patch: %w", err)
 	}
 
 	obj, err := resourceInterface.Patch(ctx, params.Name, types.JSONPatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
+		zap.L().Error("failed to apply patch", zap.String("tool", "updateKubernetesResource"), zap.Error(err))
 		return nil, nil, fmt.Errorf("failed to patch resource %s: %w", params.Name, err)
 	}
 
 	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{obj}, params.Cluster)
 	if err != nil {
+		zap.L().Error("failed to create mcp response", zap.String("tool", "updateKubernetesResource"), zap.Error(err))
 		return nil, nil, err
 	}
 
@@ -200,6 +214,8 @@ func (t *Tools) UpdateKubernetesResource(ctx context.Context, toolReq *mcp.CallT
 
 // CreateKubernetesResource creates a new Kubernetes resource.
 func (t *Tools) CreateKubernetesResource(ctx context.Context, toolReq *mcp.CallToolRequest, params CreateKubernetesResourceParams) (*mcp.CallToolResult, any, error) {
+	zap.L().Debug("createKubernetesResource called")
+
 	resourceInterface, err := t.client.GetResourceInterface(toolReq.Extra.Header.Get(tokenHeader), toolReq.Extra.Header.Get(urlHeader), params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
 	if err != nil {
 		return nil, nil, err
@@ -207,21 +223,25 @@ func (t *Tools) CreateKubernetesResource(ctx context.Context, toolReq *mcp.CallT
 
 	objBytes, err := json.Marshal(params.Resource)
 	if err != nil {
+		zap.L().Error("failed to marshal resource", zap.String("tool", "createKubernetesResource"), zap.Error(err))
 		return nil, nil, fmt.Errorf("failed to marshal resource: %w", err)
 	}
 
 	unstructuredObj := &unstructured.Unstructured{}
 	if err := json.Unmarshal(objBytes, unstructuredObj); err != nil {
+		zap.L().Error("failed to create unstructured resource", zap.String("tool", "createKubernetesResource"), zap.Error(err))
 		return nil, nil, fmt.Errorf("failed to create unstructured object: %w", err)
 	}
 
 	obj, err := resourceInterface.Create(ctx, unstructuredObj, metav1.CreateOptions{})
 	if err != nil {
+		zap.L().Error("failed to create resource", zap.String("tool", "createKubernetesResource"), zap.Error(err))
 		return nil, nil, fmt.Errorf("failed to create resource %s: %w", params.Name, err)
 	}
 
-	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{obj}, params.Cluster) //string(respWithoutManagedFields)
+	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{obj}, params.Cluster)
 	if err != nil {
+		zap.L().Error("failed to create mcp response", zap.String("tool", "createKubernetesResource"), zap.Error(err))
 		return nil, nil, err
 	}
 
@@ -232,6 +252,8 @@ func (t *Tools) CreateKubernetesResource(ctx context.Context, toolReq *mcp.CallT
 
 // InspectPod retrieves detailed information about a specific pod, its owner, metrics, and logs.
 func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, params SpecificResourceParams) (*mcp.CallToolResult, any, error) {
+	zap.L().Debug("inspectPod called")
+
 	podResource, err := t.getResource(ctx, GetParams{
 		Cluster:   params.Cluster,
 		Kind:      "pod",
@@ -241,11 +263,13 @@ func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 		Token:     toolReq.Extra.Header.Get(tokenHeader),
 	})
 	if err != nil {
+		zap.L().Error("failed to get Pod", zap.String("tool", "inspectPod"), zap.Error(err))
 		return nil, nil, err
 	}
 
 	var pod corev1.Pod
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(podResource.Object, &pod); err != nil {
+		zap.L().Error("failed to convert unstructured object to Pod", zap.String("tool", "inspectPod"), zap.Error(err))
 		return nil, nil, fmt.Errorf("failed to convert unstructured object to Pod: %w", err)
 	}
 
@@ -266,11 +290,13 @@ func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 		Token:     toolReq.Extra.Header.Get(tokenHeader),
 	})
 	if err != nil {
+		zap.L().Error("failed to get ReplicaSet", zap.String("tool", "inspectPod"), zap.Error(err))
 		return nil, nil, err
 	}
 
 	var replicaSet appsv1.ReplicaSet
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(replicaSetResource.Object, &replicaSet); err != nil {
+		zap.L().Error("failed to convert unstructured object to ReplicaSet", zap.String("tool", "inspectPod"), zap.Error(err))
 		return nil, nil, fmt.Errorf("failed to convert unstructured object to Pod: %w", err)
 	}
 
@@ -301,6 +327,7 @@ func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 		Token:     toolReq.Extra.Header.Get(tokenHeader),
 	})
 	if err != nil {
+		zap.L().Error("failed to get parent resource", zap.String("tool", "inspectPod"), zap.Error(err))
 		return nil, nil, err
 	}
 
@@ -316,6 +343,7 @@ func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 
 	logs, err := t.getPodLogs(ctx, toolReq.Extra.Header.Get(urlHeader), params.Cluster, toolReq.Extra.Header.Get(tokenHeader), pod)
 	if err != nil {
+		zap.L().Error("failed to get pod logs", zap.String("tool", "inspectPod"), zap.Error(err))
 		return nil, nil, err
 	}
 
@@ -326,6 +354,7 @@ func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 
 	mcpResponse, err := response.CreateMcpResponse(resources, params.Cluster)
 	if err != nil {
+		zap.L().Error("failed to create mcp response", zap.String("tool", "inspectPod"), zap.Error(err))
 		return nil, nil, err
 	}
 
@@ -336,6 +365,8 @@ func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 
 // GetDeploymentDetails retrieves details about a deployment and its associated pods.
 func (t *Tools) GetDeploymentDetails(ctx context.Context, toolReq *mcp.CallToolRequest, params SpecificResourceParams) (*mcp.CallToolResult, any, error) {
+	zap.L().Debug("getDeploymentDetails called")
+
 	deploymentResource, err := t.getResource(ctx, GetParams{
 		Cluster:   params.Cluster,
 		Kind:      "deployment",
@@ -345,17 +376,20 @@ func (t *Tools) GetDeploymentDetails(ctx context.Context, toolReq *mcp.CallToolR
 		Token:     toolReq.Extra.Header.Get(tokenHeader),
 	})
 	if err != nil {
+		zap.L().Error("failed to get deployment", zap.String("tool", "getDeploymentDetails"), zap.Error(err))
 		return nil, nil, err
 	}
 
 	var deployment appsv1.Deployment
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(deploymentResource.Object, &deployment); err != nil {
+		zap.L().Error("failed convert unstructured object to Deployment", zap.String("tool", "getDeploymentDetails"), zap.Error(err))
 		return nil, nil, fmt.Errorf("failed to convert unstructured object to Pod: %w", err)
 	}
 
 	// find all pods for this deployment
 	selector, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
+		zap.L().Error("failed create label selector", zap.String("tool", "getDeploymentDetails"), zap.Error(err))
 		return nil, nil, fmt.Errorf("failed to convert label selector: %w", err)
 	}
 	pods, err := t.getResources(ctx, ListParams{
@@ -368,11 +402,13 @@ func (t *Tools) GetDeploymentDetails(ctx context.Context, toolReq *mcp.CallToolR
 		LabelSelector: selector.String(),
 	})
 	if err != nil {
+		zap.L().Error("failed to get pods", zap.String("tool", "getDeploymentDetails"), zap.Error(err))
 		return nil, nil, fmt.Errorf("failed to get pods: %w", err)
 	}
 
 	mcpResponse, err := response.CreateMcpResponse(append([]*unstructured.Unstructured{deploymentResource}, pods...), params.Cluster)
 	if err != nil {
+		zap.L().Error("failed to create mcp response", zap.String("tool", "getDeploymentDetails"), zap.Error(err))
 		return nil, nil, err
 	}
 
@@ -383,6 +419,8 @@ func (t *Tools) GetDeploymentDetails(ctx context.Context, toolReq *mcp.CallToolR
 
 // GetNodes retrieves information and metrics for all nodes in a given cluster.
 func (t *Tools) GetNodes(ctx context.Context, toolReq *mcp.CallToolRequest, params GetNodesParams) (*mcp.CallToolResult, any, error) {
+	zap.L().Debug("getNodes called")
+
 	nodeResource, err := t.getResources(ctx, ListParams{
 		Cluster: params.Cluster,
 		Kind:    "node",
@@ -390,6 +428,7 @@ func (t *Tools) GetNodes(ctx context.Context, toolReq *mcp.CallToolRequest, para
 		Token:   toolReq.Extra.Header.Get(tokenHeader),
 	})
 	if err != nil {
+		zap.L().Error("failed to get nodes", zap.String("tool", "getNodes"), zap.Error(err))
 		return nil, nil, err
 	}
 
@@ -403,6 +442,7 @@ func (t *Tools) GetNodes(ctx context.Context, toolReq *mcp.CallToolRequest, para
 
 	mcpResponse, err := response.CreateMcpResponse(append(nodeResource, nodeMetricsResource...), params.Cluster)
 	if err != nil {
+		zap.L().Error("failed to create mcp response", zap.String("tool", "getNodes"), zap.Error(err))
 		return nil, nil, err
 	}
 
@@ -412,6 +452,8 @@ func (t *Tools) GetNodes(ctx context.Context, toolReq *mcp.CallToolRequest, para
 }
 
 func (t *Tools) GetClusterImages(ctx context.Context, toolReq *mcp.CallToolRequest, params GetClusterImagesParams) (*mcp.CallToolResult, any, error) {
+	zap.L().Debug("getClusterImages called")
+
 	var clusters []string
 	if len(params.Clusters) == 0 {
 		clusterList, err := t.getResources(ctx, ListParams{
@@ -421,6 +463,7 @@ func (t *Tools) GetClusterImages(ctx context.Context, toolReq *mcp.CallToolReque
 			Token:   toolReq.Extra.Header.Get(tokenHeader),
 		})
 		if err != nil {
+			zap.L().Error("failed to get clusters", zap.String("tool", "getClusterImages"), zap.Error(err))
 			return nil, nil, fmt.Errorf("failed to get clusters: %w", err)
 		}
 		for _, cluster := range clusterList {
@@ -436,10 +479,12 @@ func (t *Tools) GetClusterImages(ctx context.Context, toolReq *mcp.CallToolReque
 		var images []string
 		clientset, err := t.client.CreateClientSet(toolReq.Extra.Header.Get(tokenHeader), toolReq.Extra.Header.Get(urlHeader), cluster)
 		if err != nil {
+			zap.L().Error("failed to create clientset", zap.String("tool", "getClusterImages"), zap.Error(err))
 			return nil, nil, fmt.Errorf("failed to create clientset: %w", err)
 		}
 		pods, err := clientset.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
 		if err != nil {
+			zap.L().Error("failed to get pods", zap.String("tool", "getClusterImages"), zap.Error(err))
 			return nil, nil, fmt.Errorf("failed to get pods: %w", err)
 		}
 		for _, pod := range pods.Items {
@@ -456,6 +501,7 @@ func (t *Tools) GetClusterImages(ctx context.Context, toolReq *mcp.CallToolReque
 
 	response, err := json.Marshal(imagesInClusters)
 	if err != nil {
+		zap.L().Error("failed to create response", zap.String("tool", "getClusterImages"), zap.Error(err))
 		return nil, nil, fmt.Errorf("failed to marsha JSON: %w", err)
 	}
 
