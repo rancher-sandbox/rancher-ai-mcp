@@ -19,10 +19,10 @@ import (
 
 const (
 	skipTLSVerifyEnvVar = "INSECURE_SKIP_TLS"
-	tlsName             = "rancher-mcp-server"
+	tlsName             = "rancher-mcp-server.cattle-ai-agent-system.svc"
 	certNamespace       = "cattle-ai-agent-system"
-	certName            = "mcp-cert"
-	caName              = "mcp-ca"
+	certName            = "cattle-mcp-tls"
+	caName              = "cattle-mcp-ca"
 )
 
 func init() {
