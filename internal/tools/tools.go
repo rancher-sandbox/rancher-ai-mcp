@@ -65,14 +65,20 @@ type GetNodesParams struct {
 	Cluster string `json:"cluster" jsonschema:"the cluster of the resource"`
 }
 
+type JSONPatch struct {
+	Op    string `json:"op"`
+	Path  string `json:"path"`
+	Value any    `json:"value"`
+}
+
 // UpdateKubernetesResourceParams defines the structure for updating a general Kubernetes resource.
 // It includes fields required to uniquely identify a resource within a cluster.
 type UpdateKubernetesResourceParams struct {
-	Name      string        `json:"name" jsonschema:"the name of k8s resource"`
-	Namespace string        `json:"namespace" jsonschema:"the namespace of the resource"`
-	Kind      string        `json:"kind" jsonschema:"the kind of the resource"`
-	Cluster   string        `json:"cluster" jsonschema:"the cluster of the resource"`
-	Patch     []interface{} `json:"patch" jsonschema:"the patch of the request"`
+	Name      string      `json:"name" jsonschema:"the name of k8s resource"`
+	Namespace string      `json:"namespace" jsonschema:"the namespace of the resource"`
+	Kind      string      `json:"kind" jsonschema:"the kind of the resource"`
+	Cluster   string      `json:"cluster" jsonschema:"the cluster of the resource"`
+	Patch     []JSONPatch `json:"patch" jsonschema:"the patch of the request"`
 }
 
 // CreateKubernetesResourceParams defines the structure for creating a general Kubernetes resource.
