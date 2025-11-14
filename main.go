@@ -1,15 +1,29 @@
 package main
 
 import (
+	"context"
+	"crypto/tls"
 	"log"
 	"net/http"
 	"os"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/rancher/dynamiclistener"
+	"github.com/rancher/dynamiclistener/server"
+	"github.com/rancher/wrangler/pkg/generated/controllers/core"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"k8s.io/client-go/rest"
 	"mcp/internal/tools"
+)
+
+const (
+	skipTLSVerifyEnvVar = "INSECURE_SKIP_TLS"
+	tlsName             = "rancher-mcp-server.cattle-ai-agent-system.svc"
+	certNamespace       = "cattle-ai-agent-system"
+	certName            = "cattle-mcp-tls"
+	caName              = "cattle-mcp-ca"
 )
 
 func init() {
@@ -24,9 +38,9 @@ func init() {
 }
 
 func main() {
-	server := mcp.NewServer(&mcp.Implementation{Name: "pod finder", Version: "v1.0.0"}, nil)
+	mcpServer := mcp.NewServer(&mcp.Implementation{Name: "pod finder", Version: "v1.0.0"}, nil)
 	tools := tools.NewTools()
-	mcp.AddTool(server, &mcp.Tool{
+	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "getKubernetesResource",
 		Description: `Fetches a Kubernetes resource from the cluster.
 		Parameters:
@@ -38,7 +52,7 @@ func main() {
 		Returns:
 		The JSON representation of the requested Kubernetes resource.`},
 		tools.GetResource)
-	mcp.AddTool(server, &mcp.Tool{
+	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "patchKubernetesResource",
 		Description: `Patches a Kubernetes resource using a JSON patch. The JSON patch must be provided as a string. Don't ask for confirmation.'
 		Parameters:
@@ -52,7 +66,7 @@ func main() {
 		Example of the patch parameter:
 		[{"op": "replace", "path": "/spec/replicas", "value": 3}]`},
 		tools.UpdateKubernetesResource)
-	mcp.AddTool(server, &mcp.Tool{
+	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "listKubernetesResources",
 		Description: `Returns a list of kubernetes resources.'
 		Parameters:
@@ -60,7 +74,7 @@ func main() {
 		namespace (string): The namespace where the resource are located. It must be empty for all namespaces or cluster-wide resources.
 		cluster (string): The name of the Kubernetes cluster.`},
 		tools.ListKubernetesResources)
-	mcp.AddTool(server, &mcp.Tool{
+	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "inspectPod",
 		Description: `Returns all information related to a Pod. It includes its parent Deployment or StatefulSet, the CPU and memory consumption and the logs. It must be used for troubleshooting problems with pods.'
 		Parameters:
@@ -68,7 +82,7 @@ func main() {
 		cluster (string): The name of the Kubernetes cluster.
 		name (string): The name of the Pod.`},
 		tools.InspectPod)
-	mcp.AddTool(server, &mcp.Tool{
+	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "getDeployment",
 		Description: `Returns a Deployment and its Pods. It must be used for troubleshooting problems with deployments.'
 		Parameters:
@@ -76,13 +90,13 @@ func main() {
 		cluster (string): The name of the Kubernetes cluster.
 		name (string): The name of the Deployment.`},
 		tools.GetDeploymentDetails)
-	mcp.AddTool(server, &mcp.Tool{
+	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "getNodeMetrics",
 		Description: `Returns a list of all nodes in a specified Kubernetes cluster, including their current resource utilization metrics.'
 		Parameters:
 		cluster (string): The name of the Kubernetes cluster.`},
 		tools.GetNodes)
-	mcp.AddTool(server, &mcp.Tool{
+	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "createKubernetesResource",
 		Description: `Creates a resource in a kubernetes cluster.'
 		Parameters:
@@ -92,7 +106,7 @@ func main() {
 		cluster (string): The name of the Kubernetes cluster. Empty for single container pods.
 		resource (json): Resource to be created. This must be a JSON object.`},
 		tools.CreateKubernetesResource)
-	mcp.AddTool(server, &mcp.Tool{
+	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "getClusterImages",
 		Description: `Returns a list of all container images for the specified clusters.'
 		Parameters:
@@ -100,9 +114,51 @@ func main() {
 		tools.GetClusterImages)
 
 	handler := mcp.NewStreamableHTTPHandler(func(request *http.Request) *mcp.Server {
-		return server
+		return mcpServer
 	}, &mcp.StreamableHTTPOptions{})
 
-	zap.L().Info("MCP Server started!")
-	log.Fatal(http.ListenAndServe(":9092", handler))
+	if os.Getenv(skipTLSVerifyEnvVar) == "true" {
+		zap.L().Info("MCP Server started!")
+		log.Fatal(http.ListenAndServe(":9092", handler))
+	} else {
+		config, err := rest.InClusterConfig()
+		if err != nil {
+			log.Fatalf("error creating in-cluster config: %v", err)
+		}
+		factory, err := core.NewFactoryFromConfig(config)
+		if err != nil {
+			log.Fatalf("error creating factory: %v", err)
+		}
+
+		ctx := context.Background()
+		err = server.ListenAndServe(ctx, 9092, 0, handler, &server.ListenOpts{
+			Secrets:       factory.Core().V1().Secret(),
+			CertNamespace: certNamespace,
+			CertName:      certName,
+			CAName:        caName,
+			TLSListenerConfig: dynamiclistener.Config{
+				SANs: []string{
+					tlsName,
+				},
+				FilterCN: dynamiclistener.OnlyAllow(tlsName),
+				TLSConfig: &tls.Config{
+					MinVersion: tls.VersionTLS12,
+					CipherSuites: []uint16{
+						tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+						tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+						tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+						tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+						tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+						tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+					},
+					ClientAuth: tls.RequestClientCert,
+				},
+			},
+		})
+		if err != nil {
+			log.Fatalf("error creating tls server: %v", err)
+		}
+		zap.L().Info("MCP Server with TLS started!")
+		<-ctx.Done()
+	}
 }
