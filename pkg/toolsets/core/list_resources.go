@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 
+	"mcp/internal/middleware"
 	"mcp/pkg/client"
 	"mcp/pkg/response"
 
@@ -26,7 +27,7 @@ func (t *Tools) listKubernetesResources(ctx context.Context, toolReq *mcp.CallTo
 		Kind:      params.Kind,
 		Namespace: params.Namespace,
 		URL:       toolReq.Extra.Header.Get(urlHeader),
-		Token:     toolReq.Extra.Header.Get(tokenHeader),
+		Token:     middleware.Token(ctx),
 	})
 	if err != nil {
 		zap.L().Error("failed to list resources", zap.String("tool", "listKubernetesResource"), zap.Error(err))

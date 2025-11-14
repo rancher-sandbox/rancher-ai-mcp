@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 
+	"mcp/internal/middleware"
 	"mcp/pkg/client"
 	"mcp/pkg/response"
 
@@ -23,7 +24,7 @@ func (t *Tools) getNodes(ctx context.Context, toolReq *mcp.CallToolRequest, para
 		Cluster: params.Cluster,
 		Kind:    "node",
 		URL:     toolReq.Extra.Header.Get(urlHeader),
-		Token:   toolReq.Extra.Header.Get(tokenHeader),
+		Token:   middleware.Token(ctx),
 	})
 	if err != nil {
 		zap.L().Error("failed to get nodes", zap.String("tool", "getNodes"), zap.Error(err))
@@ -35,7 +36,7 @@ func (t *Tools) getNodes(ctx context.Context, toolReq *mcp.CallToolRequest, para
 		Cluster: params.Cluster,
 		Kind:    "node.metrics.k8s.io",
 		URL:     toolReq.Extra.Header.Get(urlHeader),
-		Token:   toolReq.Extra.Header.Get(tokenHeader),
+		Token:   middleware.Token(ctx),
 	})
 
 	mcpResponse, err := response.CreateMcpResponse(append(nodeResource, nodeMetricsResource...), params.Cluster)

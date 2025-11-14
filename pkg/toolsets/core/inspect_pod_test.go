@@ -1,13 +1,14 @@
 package core
 
 import (
-	"context"
 	"testing"
 
+	"mcp/internal/middleware"
 	"mcp/pkg/client"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -455,17 +456,17 @@ func TestInspectPod(t *testing.T) {
 					return test.fakeDynClient, nil
 				},
 			}
-			tools := Tools{client: c}
+			tools := Tools{client: newFakeToolsClient(c, fakeToken)}
 
-			result, _, err := tools.inspectPod(context.TODO(), &mcp.CallToolRequest{
-				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}, tokenHeader: {fakeToken}}},
+			result, _, err := tools.inspectPod(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{
+				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}}},
 			}, test.params)
 
 			if test.expectedError != "" {
 				assert.ErrorContains(t, err, test.expectedError)
 				assert.Nil(t, result)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.JSONEq(t, test.expectedResult, result.Content[0].(*mcp.TextContent).Text)
 			}
 		})

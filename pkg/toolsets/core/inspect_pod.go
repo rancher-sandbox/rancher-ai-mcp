@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"mcp/internal/middleware"
 	"mcp/pkg/client"
 	"mcp/pkg/response"
 
@@ -37,7 +38,7 @@ func (t *Tools) inspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 		Namespace: params.Namespace,
 		Name:      params.Name,
 		URL:       toolReq.Extra.Header.Get(urlHeader),
-		Token:     toolReq.Extra.Header.Get(tokenHeader),
+		Token:     middleware.Token(ctx),
 	})
 	if err != nil {
 		zap.L().Error("failed to get Pod", zap.String("tool", "inspectPod"), zap.Error(err))
@@ -64,7 +65,7 @@ func (t *Tools) inspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 		Namespace: params.Namespace,
 		Name:      replicaSetName,
 		URL:       toolReq.Extra.Header.Get(urlHeader),
-		Token:     toolReq.Extra.Header.Get(tokenHeader),
+		Token:     middleware.Token(ctx),
 	})
 	if err != nil {
 		zap.L().Error("failed to get ReplicaSet", zap.String("tool", "inspectPod"), zap.Error(err))
@@ -91,7 +92,7 @@ func (t *Tools) inspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 		Namespace: params.Namespace,
 		Name:      parentName,
 		URL:       toolReq.Extra.Header.Get(urlHeader),
-		Token:     toolReq.Extra.Header.Get(tokenHeader),
+		Token:     middleware.Token(ctx),
 	})
 	if err != nil {
 		zap.L().Error("failed to get parent resource", zap.String("tool", "inspectPod"), zap.Error(err))
@@ -105,10 +106,10 @@ func (t *Tools) inspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 		Namespace: params.Namespace,
 		Name:      params.Name,
 		URL:       toolReq.Extra.Header.Get(urlHeader),
-		Token:     toolReq.Extra.Header.Get(tokenHeader),
+		Token:     middleware.Token(ctx),
 	})
 
-	logs, err := t.getPodLogs(ctx, toolReq.Extra.Header.Get(urlHeader), params.Cluster, toolReq.Extra.Header.Get(tokenHeader), pod)
+	logs, err := t.getPodLogs(ctx, toolReq.Extra.Header.Get(urlHeader), params.Cluster, middleware.Token(ctx), pod)
 	if err != nil {
 		zap.L().Error("failed to get pod logs", zap.String("tool", "inspectPod"), zap.Error(err))
 		return nil, nil, err

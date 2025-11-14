@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"mcp/internal/middleware"
 	"mcp/pkg/client"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -29,8 +30,9 @@ func (t *Tools) getClusterImages(ctx context.Context, toolReq *mcp.CallToolReque
 			Cluster: "local",
 			Kind:    "cluster",
 			URL:     toolReq.Extra.Header.Get(urlHeader),
-			Token:   toolReq.Extra.Header.Get(tokenHeader),
+			Token:   middleware.Token(ctx),
 		})
+
 		if err != nil {
 			zap.L().Error("failed to get clusters", zap.String("tool", "getClusterImages"), zap.Error(err))
 			return nil, nil, fmt.Errorf("failed to get clusters: %w", err)
@@ -50,7 +52,7 @@ func (t *Tools) getClusterImages(ctx context.Context, toolReq *mcp.CallToolReque
 			Cluster: cluster,
 			Kind:    "pod",
 			URL:     toolReq.Extra.Header.Get(urlHeader),
-			Token:   toolReq.Extra.Header.Get(tokenHeader),
+			Token:   middleware.Token(ctx),
 		})
 		if err != nil {
 			zap.L().Error("failed to get pods", zap.String("tool", "getClusterImages"), zap.Error(err))

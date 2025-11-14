@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"mcp/internal/middleware"
 	"mcp/pkg/client"
 	"mcp/pkg/response"
 
@@ -32,7 +33,7 @@ func (t *Tools) getDeploymentDetails(ctx context.Context, toolReq *mcp.CallToolR
 		Namespace: params.Namespace,
 		Name:      params.Name,
 		URL:       toolReq.Extra.Header.Get(urlHeader),
-		Token:     toolReq.Extra.Header.Get(tokenHeader),
+		Token:     middleware.Token(ctx),
 	})
 	if err != nil {
 		zap.L().Error("failed to get deployment", zap.String("tool", "getDeploymentDetails"), zap.Error(err))
@@ -57,7 +58,7 @@ func (t *Tools) getDeploymentDetails(ctx context.Context, toolReq *mcp.CallToolR
 		Namespace:     params.Namespace,
 		Name:          params.Name,
 		URL:           toolReq.Extra.Header.Get(urlHeader),
-		Token:         toolReq.Extra.Header.Get(tokenHeader),
+		Token:         middleware.Token(ctx),
 		LabelSelector: selector.String(),
 	})
 	if err != nil {

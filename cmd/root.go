@@ -24,9 +24,7 @@ or update Kubernetes and Rancher resources across local and downstream clusters.
 
 // Execute runs the root command
 func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		cobra.CheckErr(err)
-	}
+	cobra.CheckErr(rootCmd.Execute())
 }
 
 func init() {

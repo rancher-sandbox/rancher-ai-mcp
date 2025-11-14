@@ -12,7 +12,7 @@ func TestServeCmd(t *testing.T) {
 	assert.NotNil(t, serveCmd)
 	assert.Equal(t, "serve", serveCmd.Use)
 	assert.Equal(t, "Start the MCP server", serveCmd.Short)
-	assert.NotNil(t, serveCmd.Run)
+	assert.NotNil(t, serveCmd.RunE)
 }
 
 func TestRunServeCommand(t *testing.T) {
