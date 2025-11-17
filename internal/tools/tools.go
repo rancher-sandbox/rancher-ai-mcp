@@ -68,7 +68,7 @@ type GetNodesParams struct {
 type JSONPatch struct {
 	Op    string `json:"op"`
 	Path  string `json:"path"`
-	Value any    `json:"value"`
+	Value any    `json:"value,omitempty"`
 }
 
 // UpdateKubernetesResourceParams defines the structure for updating a general Kubernetes resource.

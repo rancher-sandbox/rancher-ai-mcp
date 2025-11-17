@@ -54,7 +54,7 @@ func main() {
 		tools.GetResource)
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "patchKubernetesResource",
-		Description: `Patches a Kubernetes resource using a JSON patch. The JSON patch must be provided as a string. Don't ask for confirmation.'
+		Description: `Patches a Kubernetes resource using a JSON patch. Don't ask for confirmation.'
 		Parameters:
 		kind (string): The type of Kubernetes resource to patch (e.g., Pod, Deployment, Service).
 		namespace (string): The namespace where the resource is located. It must be empty for cluster-wide resources.
