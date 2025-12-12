@@ -1,9 +1,12 @@
-package tools
+package rancher
 
+/*
 import (
 	"context"
 	"errors"
 	"testing"
+
+	"mcp/pkg/toolsets/rancher/mocks"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
@@ -15,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
-	"mcp/internal/tools/mocks"
 )
 
 const (

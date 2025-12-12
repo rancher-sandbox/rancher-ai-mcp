@@ -1,11 +1,12 @@
 package response
 
 import (
+	"encoding/json"
 	"fmt"
-	"mcp/internal/tools/converter"
 	"strings"
 
-	"encoding/json"
+	"mcp/pkg/converter"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
