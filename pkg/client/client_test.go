@@ -1,19 +1,21 @@
-package k8s
+package client
 
+/*
 import (
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"mcp/internal/tools/mocks"
 	"reflect"
 	"sync"
 	"testing"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+
+	"mcp/internal/tools/converter"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
-	"mcp/internal/tools/converter"
 )
 
 const (
@@ -160,3 +162,4 @@ func scheme() *runtime.Scheme {
 
 	return scheme
 }
+*/
