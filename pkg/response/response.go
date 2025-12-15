@@ -40,6 +40,9 @@ func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string) (strin
 		// Remove managedFields from each object to reduce payload size and remove irrelevant data for the LLM.
 		removeManagedFieldsIfPresent(obj)
 		lowerKind := strings.ToLower(obj.GetKind())
+		if lowerKind == "" {
+			continue
+		}
 		steveType := lowerKind
 		if gvr, ok := converter.K8sKindsToGVRs[lowerKind]; ok && gvr.Group != "" {
 			steveType = gvr.Group + "." + lowerKind

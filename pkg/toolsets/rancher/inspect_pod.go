@@ -165,5 +165,5 @@ func (t *Tools) getPodLogs(ctx context.Context, url string, cluster string, toke
 		}
 	}
 
-	return &unstructured.Unstructured{Object: map[string]interface{}{"pod-logs": logs.Logs}}, nil
+	return &unstructured.Unstructured{Object: map[string]any{"pod-logs": logs.Logs}}, nil
 }

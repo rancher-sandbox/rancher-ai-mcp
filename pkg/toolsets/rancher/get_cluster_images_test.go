@@ -63,14 +63,18 @@ func TestGetClusterImages(t *testing.T) {
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(podScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
 			}, fakePodWithImage),
-			expectedResult: `{"local":["busybox:latest","nginx:1.21","redis:alpine"]}`,
+			expectedResult: `{
+				"local": ["busybox:latest", "nginx:1.21", "redis:alpine"]
+			}`,
 		},
 		"get images from cluster with no pods": {
 			params: getClusterImagesParams{Clusters: []string{"local"}},
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(podScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
 			}),
-			expectedResult: `{"local":[]}`,
+			expectedResult: `{
+				"local": []
+			}`,
 		},
 	}
 

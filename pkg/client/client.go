@@ -40,7 +40,7 @@ type K8sClient interface {
 // Client is a struct that provides methods for interacting with Kubernetes clusters.
 type Client struct {
 	DynClientCreator func(*rest.Config) (dynamic.Interface, error)
-	ClientSetCreator func(*rest.Config) (*kubernetes.Clientset, error)
+	ClientSetCreator func(*rest.Config) (kubernetes.Interface, error)
 }
 
 // GetParams holds the parameters required to get a resource from k8s.
@@ -70,7 +70,9 @@ func NewClient() *Client {
 		DynClientCreator: func(cfg *rest.Config) (dynamic.Interface, error) {
 			return dynamic.NewForConfig(cfg)
 		},
-		ClientSetCreator: kubernetes.NewForConfig,
+		ClientSetCreator: func(cfg *rest.Config) (kubernetes.Interface, error) {
+			return kubernetes.NewForConfig(cfg)
+		},
 	}
 }
 

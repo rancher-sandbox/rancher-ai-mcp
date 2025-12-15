@@ -78,7 +78,20 @@ func TestListKubernetesResources(t *testing.T) {
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listResourcesScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
 			}, fakePod1, fakePod2),
-			expectedResult: `{"llm":[{"metadata":{"name":"pod-1","namespace":"default"},"spec":{"containers":[{"image":"nginx:latest","name":"nginx","resources":{}}]},"status":{"phase":"Running"}},{"metadata":{"name":"pod-2","namespace":"default"},"spec":{"containers":[{"image":"redis:latest","name":"redis","resources":{}}]},"status":{"phase":"Running"}}],"uiContext":[{"cluster":"local","kind":"","name":"pod-1","namespace":"default"},{"cluster":"local","kind":"","name":"pod-2","namespace":"default"}]}`,
+			expectedResult: `{
+				"llm": [
+					{
+						"metadata": {"name": "pod-1", "namespace": "default"},
+						"spec": {"containers": [{"image": "nginx:latest", "name": "nginx", "resources": {}}]},
+						"status": {"phase": "Running"}
+					},
+					{
+						"metadata": {"name": "pod-2", "namespace": "default"},
+						"spec": {"containers": [{"image": "redis:latest", "name": "redis", "resources": {}}]},
+						"status": {"phase": "Running"}
+					}
+				]
+			}`,
 		},
 		"list pods - empty namespace": {
 			params: ListKubernetesResourcesParams{
@@ -89,7 +102,7 @@ func TestListKubernetesResources(t *testing.T) {
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listResourcesScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
 			}),
-			expectedResult: `{"llm":"no resources found"}`,
+			expectedResult: `{"llm": "no resources found"}`,
 		},
 	}
 

@@ -107,7 +107,40 @@ func TestGetDeploymentDetails(t *testing.T) {
 				{Group: "apps", Version: "v1", Resource: "deployments"}: "DeploymentList",
 				{Group: "", Version: "v1", Resource: "pods"}:            "PodList",
 			}, fakeDeployment, fakeDeploymentPod),
-			expectedResult: `{"llm":[{"apiVersion":"apps/v1","kind":"Deployment","metadata":{"name":"nginx-deployment","namespace":"default"},"spec":{"replicas":2,"selector":{"matchLabels":{"app":"nginx"}},"strategy":{},"template":{"metadata":{"labels":{"app":"nginx"}},"spec":{"containers":[{"image":"nginx:1.21","name":"nginx","ports":[{"containerPort":80,"protocol":"TCP"}],"resources":{}}]}}},"status":{}},{"apiVersion":"v1","kind":"Pod","metadata":{"labels":{"app":"nginx"},"name":"nginx-deployment-abc123","namespace":"default"},"spec":{"containers":[{"image":"nginx:1.21","name":"nginx","resources":{}}]},"status":{"phase":"Running"}}],"uiContext":[{"cluster":"local","kind":"Deployment","name":"nginx-deployment","namespace":"default","type":"apps.deployment"},{"cluster":"local","kind":"Pod","name":"nginx-deployment-abc123","namespace":"default","type":"pod"}]}`,
+			expectedResult: `{
+				"llm": [
+					{
+						"apiVersion": "apps/v1",
+						"kind": "Deployment",
+						"metadata": {"name": "nginx-deployment", "namespace": "default"},
+						"spec": {
+							"replicas": 2,
+							"selector": {"matchLabels": {"app": "nginx"}},
+							"strategy": {},
+							"template": {
+								"metadata": {"labels": {"app": "nginx"}},
+								"spec": {
+									"containers": [
+										{"image": "nginx:1.21", "name": "nginx", "ports": [{"containerPort": 80, "protocol": "TCP"}], "resources": {}}
+									]
+								}
+							}
+						},
+						"status": {}
+					},
+					{
+						"apiVersion": "v1",
+						"kind": "Pod",
+						"metadata": {"labels": {"app": "nginx"}, "name": "nginx-deployment-abc123", "namespace": "default"},
+						"spec": {"containers": [{"image": "nginx:1.21", "name": "nginx", "resources": {}}]},
+						"status": {"phase": "Running"}
+					}
+				],
+				"uiContext": [
+					{"cluster": "local", "kind": "Deployment", "name": "nginx-deployment", "namespace": "default", "type": "apps.deployment"},
+					{"cluster": "local", "kind": "Pod", "name": "nginx-deployment-abc123", "namespace": "default", "type": "pod"}
+				]
+			}`,
 		},
 		"get deployment - not found": {
 			params: specificResourceParams{

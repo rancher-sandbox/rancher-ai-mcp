@@ -61,7 +61,19 @@ func TestUpdateKubernetesResource(t *testing.T) {
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(patchResourceScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "configmaps"}: "ConfigMapList",
 			}, fakeConfigMapForPatch),
-			expectedResult: `{"llm":[{"apiVersion":"v1","data":{"key1":"value1","key2":"value2","key3":"value3"},"kind":"ConfigMap","metadata":{"name":"test-config","namespace":"default"}}],"uiContext":[{"cluster":"local","kind":"ConfigMap","name":"test-config","namespace":"default","type":"configmap"}]}`,
+			expectedResult: `{
+				"llm": [
+					{
+						"apiVersion": "v1",
+						"data": {"key1": "value1", "key2": "value2", "key3": "value3"},
+						"kind": "ConfigMap",
+						"metadata": {"name": "test-config", "namespace": "default"}
+					}
+				],
+				"uiContext": [
+					{"cluster": "local", "kind": "ConfigMap", "name": "test-config", "namespace": "default", "type": "configmap"}
+				]
+			}`,
 		},
 		"update configmap - replace existing key": {
 			params: UpdateKubernetesResourceParams{
@@ -80,7 +92,19 @@ func TestUpdateKubernetesResource(t *testing.T) {
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(patchResourceScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "configmaps"}: "ConfigMapList",
 			}, fakeConfigMapForPatch),
-			expectedResult: `{"llm":[{"apiVersion":"v1","data":{"key1":"updated-value","key2":"value2"},"kind":"ConfigMap","metadata":{"name":"test-config","namespace":"default"}}],"uiContext":[{"cluster":"local","kind":"ConfigMap","name":"test-config","namespace":"default","type":"configmap"}]}`,
+			expectedResult: `{
+				"llm": [
+					{
+						"apiVersion": "v1",
+						"data": {"key1": "updated-value", "key2": "value2"},
+						"kind": "ConfigMap",
+						"metadata": {"name": "test-config", "namespace": "default"}
+					}
+				],
+				"uiContext": [
+					{"cluster": "local", "kind": "ConfigMap", "name": "test-config", "namespace": "default", "type": "configmap"}
+				]
+			}`,
 		},
 		"update configmap - remove key": {
 			params: UpdateKubernetesResourceParams{
@@ -98,7 +122,19 @@ func TestUpdateKubernetesResource(t *testing.T) {
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(patchResourceScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "configmaps"}: "ConfigMapList",
 			}, fakeConfigMapForPatch),
-			expectedResult: `{"llm":[{"apiVersion":"v1","data":{"key1":"value1"},"kind":"ConfigMap","metadata":{"name":"test-config","namespace":"default"}}],"uiContext":[{"cluster":"local","kind":"ConfigMap","name":"test-config","namespace":"default","type":"configmap"}]}`,
+			expectedResult: `{
+				"llm": [
+					{
+						"apiVersion": "v1",
+						"data": {"key1": "value1"},
+						"kind": "ConfigMap",
+						"metadata": {"name": "test-config", "namespace": "default"}
+					}
+				],
+				"uiContext": [
+					{"cluster": "local", "kind": "ConfigMap", "name": "test-config", "namespace": "default", "type": "configmap"}
+				]
+			}`,
 		},
 		"update configmap - not found": {
 			params: UpdateKubernetesResourceParams{

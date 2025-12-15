@@ -57,7 +57,31 @@ func TestGetNodes(t *testing.T) {
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(nodeScheme(), map[schema.GroupVersionResource]string{
 				{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "nodes"}: "NodeMetricsList",
 			}, fakeNode),
-			expectedResult: `{"llm":[{"metadata":{"name":"node-1"},"spec":{},"status":{"allocatable":{"cpu":"4","memory":"8Gi"},"capacity":{"cpu":"4","memory":"8Gi"},"daemonEndpoints":{"kubeletEndpoint":{"Port":0}},"nodeInfo":{"architecture":"","bootID":"","containerRuntimeVersion":"","kernelVersion":"","kubeProxyVersion":"","kubeletVersion":"","machineID":"","operatingSystem":"","osImage":"","systemUUID":""}}}],"uiContext":[{"namespace":"","kind":"","cluster":"local","name":"node-1"}]}`,
+			expectedResult: `{
+				"llm": [
+					{
+						"metadata": {"name": "node-1"},
+						"spec": {},
+						"status": {
+							"allocatable": {"cpu": "4", "memory": "8Gi"},
+							"capacity": {"cpu": "4", "memory": "8Gi"},
+							"daemonEndpoints": {"kubeletEndpoint": {"Port": 0}},
+							"nodeInfo": {
+								"architecture": "",
+								"bootID": "",
+								"containerRuntimeVersion": "",
+								"kernelVersion": "",
+								"kubeProxyVersion": "",
+								"kubeletVersion": "",
+								"machineID": "",
+								"operatingSystem": "",
+								"osImage": "",
+								"systemUUID": ""
+							}
+						}
+					}
+				]
+			}`,
 		},
 	}
 

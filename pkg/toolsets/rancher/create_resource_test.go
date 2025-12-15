@@ -56,7 +56,19 @@ func TestCreateKubernetesResource(t *testing.T) {
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(createResourceScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "configmaps"}: "ConfigMapList",
 			}),
-			expectedResult: `{"llm":[{"apiVersion":"v1","data":{"key1":"value1","key2":"value2"},"kind":"ConfigMap","metadata":{"name":"test-config","namespace":"default"}}],"uiContext":[{"namespace":"default","kind":"ConfigMap","cluster":"local","name":"test-config","type":"configmap"}]}`,
+			expectedResult: `{
+				"llm": [
+					{
+						"apiVersion": "v1",
+						"data": {"key1": "value1", "key2": "value2"},
+						"kind": "ConfigMap",
+						"metadata": {"name": "test-config", "namespace": "default"}
+					}
+				],
+				"uiContext": [
+					{"namespace": "default", "kind": "ConfigMap", "cluster": "local", "name": "test-config", "type": "configmap"}
+				]
+			}`,
 		},
 		"create configmap - invalid": {
 			params: createKubernetesResourceParams{
