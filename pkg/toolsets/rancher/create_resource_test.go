@@ -70,6 +70,17 @@ func TestCreateKubernetesResource(t *testing.T) {
 				]
 			}`,
 		},
+		"create configmap - marshal error": {
+			params: createKubernetesResourceParams{
+				Name:      "test-config",
+				Namespace: "default",
+				Kind:      "configmap",
+				Cluster:   "local",
+				Resource:  make(chan int),
+			},
+			fakeDynClient: dynamicfake.NewSimpleDynamicClient(createResourceScheme()),
+			expectedError: `failed to marshal resource`,
+		},
 		"create configmap - invalid": {
 			params: createKubernetesResourceParams{
 				Name:      "test-config",

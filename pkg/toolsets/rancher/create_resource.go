@@ -15,6 +15,11 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+const (
+	tokenHeader = "R_token"
+	urlHeader   = "R_url"
+)
+
 // createKubernetesResourceParams defines the structure for creating a general Kubernetes resource.
 type createKubernetesResourceParams struct {
 	Name      string `json:"name" jsonschema:"the name of k8s resource"`

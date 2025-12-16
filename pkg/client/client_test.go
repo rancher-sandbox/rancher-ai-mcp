@@ -1,21 +1,20 @@
 package client
 
-/*
 import (
+	"context"
 	"reflect"
 	"sync"
 	"testing"
 
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-
-	"mcp/internal/tools/converter"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/rest"
 )
 
 const (
@@ -26,13 +25,13 @@ const (
 // helper to create a fake cluster object for tests.
 func newFakeCluster(id, displayName string) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "management.cattle.io/v3",
 			"kind":       "Cluster",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": id,
 			},
-			"spec": map[string]interface{}{
+			"spec": map[string]any{
 				"displayName": displayName,
 			},
 		},
@@ -40,77 +39,47 @@ func newFakeCluster(id, displayName string) *unstructured.Unstructured {
 }
 
 func TestGetClusterId(t *testing.T) {
-	ctlr := gomock.NewController(t)
-
-	// GVR for a Rancher Cluster
-	clusterGVR := converter.K8sKindsToGVRs["cluster"]
-
 	const (
 		clusterID = "c-m-12345"
 		clusterDN = "my-display-name"
 	)
 
-	// Define test cases
 	tests := map[string]struct {
 		clusterNameOrIDInput                 string
-		mockClient                           func() resourceInterface
-		expectedClusterIdsCache              map[string]interface{}
-		expectedClustersDisplayNameToIDCache map[string]interface{}
+		fakeDynClient                        *dynamicfake.FakeDynamicClient
+		expectedClusterIdsCache              map[string]any
+		expectedClustersDisplayNameToIDCache map[string]any
 		expectedID                           string
 		expectErr                            string
 	}{
 		"should return clusterID if input is a clusterID": {
-			clusterNameOrIDInput: clusterID,
-			mockClient: func() resourceInterface {
-				mock := mocks.NewMockK8sClient(ctlr)
-				fakeClient := dynamicfake.NewSimpleDynamicClient(scheme(), newFakeCluster(clusterID, clusterDN)).Resource(clusterGVR)
-				mock.EXPECT().GetResourceInterface(fakeToken, fakeUrl, "", "local", clusterGVR).Return(fakeClient, nil)
-
-				return mock
-
-			},
-			expectedClusterIdsCache:              map[string]interface{}{clusterID: struct{}{}},
-			expectedClustersDisplayNameToIDCache: map[string]interface{}{clusterDN: clusterID},
+			clusterNameOrIDInput:                 clusterID,
+			fakeDynClient:                        dynamicfake.NewSimpleDynamicClient(scheme(), newFakeCluster(clusterID, clusterDN)),
+			expectedClusterIdsCache:              map[string]any{clusterID: struct{}{}},
+			expectedClustersDisplayNameToIDCache: map[string]any{clusterDN: clusterID},
 			expectedID:                           clusterID,
 		},
 
 		"should return clusterID if input is a cluster displayName": {
-			clusterNameOrIDInput: clusterDN,
-			mockClient: func() resourceInterface {
-				mock := mocks.NewMockK8sClient(ctlr)
-				fakeClient := dynamicfake.NewSimpleDynamicClient(scheme(), newFakeCluster(clusterID, clusterDN)).Resource(clusterGVR)
-				mock.EXPECT().GetResourceInterface(fakeToken, fakeUrl, "", "local", clusterGVR).Return(fakeClient, nil)
-
-				return mock
-
-			},
-			expectedClusterIdsCache:              map[string]interface{}{clusterID: struct{}{}},
-			expectedClustersDisplayNameToIDCache: map[string]interface{}{clusterDN: clusterID},
+			clusterNameOrIDInput:                 clusterDN,
+			fakeDynClient:                        dynamicfake.NewSimpleDynamicClient(scheme(), newFakeCluster(clusterID, clusterDN)),
+			expectedClusterIdsCache:              map[string]any{clusterID: struct{}{}},
+			expectedClustersDisplayNameToIDCache: map[string]any{clusterDN: clusterID},
 			expectedID:                           clusterID,
 		},
 
 		"local": {
-			clusterNameOrIDInput: "local",
-			mockClient: func() resourceInterface {
-				return mocks.NewMockK8sClient(ctlr)
-			},
-			expectedClusterIdsCache:              map[string]interface{}{},
-			expectedClustersDisplayNameToIDCache: map[string]interface{}{},
+			clusterNameOrIDInput:                 "local",
+			expectedClusterIdsCache:              map[string]any{},
+			expectedClustersDisplayNameToIDCache: map[string]any{},
 			expectedID:                           "local",
 		},
 
 		"cluster not found": {
-			clusterNameOrIDInput: clusterDN,
-			mockClient: func() resourceInterface {
-				mock := mocks.NewMockK8sClient(ctlr)
-				fakeClient := dynamicfake.NewSimpleDynamicClient(scheme(), newFakeCluster(clusterID, "another cluster")).Resource(clusterGVR)
-				mock.EXPECT().GetResourceInterface(fakeToken, fakeUrl, "", "local", clusterGVR).Return(fakeClient, nil)
-
-				return mock
-
-			},
-			expectedClusterIdsCache:              map[string]interface{}{clusterID: struct{}{}},
-			expectedClustersDisplayNameToIDCache: map[string]interface{}{"another cluster": clusterID},
+			clusterNameOrIDInput:                 clusterDN,
+			fakeDynClient:                        dynamicfake.NewSimpleDynamicClient(scheme(), newFakeCluster(clusterID, "another cluster")),
+			expectedClusterIdsCache:              map[string]any{clusterID: struct{}{}},
+			expectedClustersDisplayNameToIDCache: map[string]any{"another cluster": clusterID},
 			expectErr:                            "cluster 'my-display-name' not found",
 		},
 	}
@@ -120,7 +89,13 @@ func TestGetClusterId(t *testing.T) {
 			clusterIdsCache = sync.Map{}
 			clustersDisplayNameToIDCache = sync.Map{}
 
-			clusterID, err := getClusterId(test.mockClient(), fakeToken, fakeUrl, test.clusterNameOrIDInput)
+			c := &Client{
+				DynClientCreator: func(inConfig *rest.Config) (dynamic.Interface, error) {
+					return test.fakeDynClient, nil
+				},
+			}
+
+			clusterID, err := c.getClusterId(fakeToken, fakeUrl, test.clusterNameOrIDInput)
 
 			if test.expectErr != "" {
 				require.ErrorContains(t, err, test.expectErr)
@@ -134,13 +109,13 @@ func TestGetClusterId(t *testing.T) {
 	}
 }
 
-func compareMapWithSyncMap(standardMap map[string]interface{}, syncMap *sync.Map) bool {
+func compareMapWithSyncMap(standardMap map[string]any, syncMap *sync.Map) bool {
 	// extract contents of the sync.Map into a temporary map and count elements
-	syncMapContents := make(map[string]interface{})
+	syncMapContents := make(map[string]any)
 	syncMapCount := 0
 
 	// Use Range for thread-safe iteration
-	syncMap.Range(func(key, value interface{}) bool {
+	syncMap.Range(func(key, value any) bool {
 		keyStr := key.(string)
 		syncMapContents[keyStr] = value
 		syncMapCount++
@@ -162,4 +137,177 @@ func scheme() *runtime.Scheme {
 
 	return scheme
 }
-*/
+
+func TestGetResource(t *testing.T) {
+	fakePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "nginx",
+					Image: "nginx:latest",
+				},
+			},
+		},
+	}
+
+	tests := map[string]struct {
+		params        GetParams
+		fakeDynClient *dynamicfake.FakeDynamicClient
+		expectedName  string
+		expectedError string
+	}{
+		"get pod successfully": {
+			params: GetParams{
+				Cluster:   "local",
+				Kind:      "pod",
+				Namespace: "default",
+				Name:      "test-pod",
+				URL:       fakeUrl,
+				Token:     fakeToken,
+			},
+			fakeDynClient: dynamicfake.NewSimpleDynamicClient(scheme(), fakePod),
+			expectedName:  "test-pod",
+		},
+		"resource not found": {
+			params: GetParams{
+				Cluster:   "local",
+				Kind:      "pod",
+				Namespace: "default",
+				Name:      "nonexistent-pod",
+				URL:       fakeUrl,
+				Token:     fakeToken,
+			},
+			fakeDynClient: dynamicfake.NewSimpleDynamicClient(scheme()),
+			expectedError: `pods "nonexistent-pod" not found`,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := &Client{
+				DynClientCreator: func(inConfig *rest.Config) (dynamic.Interface, error) {
+					return test.fakeDynClient, nil
+				},
+			}
+
+			result, err := c.GetResource(context.Background(), test.params)
+
+			if test.expectedError != "" {
+				assert.ErrorContains(t, err, test.expectedError)
+				assert.Nil(t, result)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, result)
+				assert.Equal(t, test.expectedName, result.GetName())
+			}
+		})
+	}
+}
+
+func TestGetResources(t *testing.T) {
+	fakePod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod-1",
+			Namespace: "default",
+			Labels: map[string]string{
+				"app": "nginx",
+			},
+		},
+	}
+
+	fakePod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod-2",
+			Namespace: "default",
+			Labels: map[string]string{
+				"app": "nginx",
+			},
+		},
+	}
+
+	fakePod3 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod-3",
+			Namespace: "default",
+			Labels: map[string]string{
+				"app": "redis",
+			},
+		},
+	}
+
+	tests := map[string]struct {
+		params        ListParams
+		fakeDynClient *dynamicfake.FakeDynamicClient
+		expectedCount int
+		expectedNames []string
+		expectedError string
+	}{
+		"list all pods in namespace": {
+			params: ListParams{
+				Cluster:   "local",
+				Kind:      "pod",
+				Namespace: "default",
+				URL:       fakeUrl,
+				Token:     fakeToken,
+			},
+			fakeDynClient: dynamicfake.NewSimpleDynamicClient(scheme(), fakePod1, fakePod2, fakePod3),
+			expectedCount: 3,
+			expectedNames: []string{"pod-1", "pod-2", "pod-3"},
+		},
+		"list pods with label selector": {
+			params: ListParams{
+				Cluster:       "local",
+				Kind:          "pod",
+				Namespace:     "default",
+				URL:           fakeUrl,
+				Token:         fakeToken,
+				LabelSelector: "app=nginx",
+			},
+			fakeDynClient: dynamicfake.NewSimpleDynamicClient(scheme(), fakePod1, fakePod2, fakePod3),
+			expectedCount: 2,
+			expectedNames: []string{"pod-1", "pod-2"},
+		},
+		"list empty namespace": {
+			params: ListParams{
+				Cluster:   "local",
+				Kind:      "pod",
+				Namespace: "kube-system",
+				URL:       fakeUrl,
+				Token:     fakeToken,
+			},
+			fakeDynClient: dynamicfake.NewSimpleDynamicClient(scheme()),
+			expectedCount: 0,
+			expectedNames: []string{},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := &Client{
+				DynClientCreator: func(inConfig *rest.Config) (dynamic.Interface, error) {
+					return test.fakeDynClient, nil
+				},
+			}
+
+			results, err := c.GetResources(context.Background(), test.params)
+
+			if test.expectedError != "" {
+				assert.ErrorContains(t, err, test.expectedError)
+				assert.Nil(t, results)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, results, test.expectedCount)
+
+				actualNames := make([]string, len(results))
+				for i, result := range results {
+					actualNames[i] = result.GetName()
+				}
+				assert.ElementsMatch(t, test.expectedNames, actualNames)
+			}
+		})
+	}
+}

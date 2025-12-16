@@ -18,6 +18,10 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+const (
+	podLogsTailLines = 50
+)
+
 // ContainerLogs holds logs for multiple containers.
 type ContainerLogs struct {
 	Logs map[string]any `json:"logs"`

@@ -83,6 +83,14 @@ func TestGetNodes(t *testing.T) {
 				]
 			}`,
 		},
+		"get nodes - not found": {
+			params: getNodesParams{Cluster: "local"},
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(nodeScheme(), map[schema.GroupVersionResource]string{
+				{Group: "", Version: "v1", Resource: "nodes"}:                    "NodeList",
+				{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "nodes"}: "NodeMetricsList",
+			}),
+			expectedResult: `{"llm":"no resources found"}`,
+		},
 	}
 
 	for name, test := range tests {

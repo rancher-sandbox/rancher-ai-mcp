@@ -25,18 +25,6 @@ const skipTLSVerifyEnvVar = "INSECURE_SKIP_TLS"
 var clusterIdsCache = sync.Map{}
 var clustersDisplayNameToIDCache = sync.Map{}
 
-type resourceInterface interface {
-	GetResourceInterface(token string, url string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error)
-}
-
-// K8sClient defines an interface for a Kubernetes client.
-type K8sClient interface {
-	GetResourceInterface(token string, url string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error)
-	CreateClientSet(token string, url string, cluster string) (kubernetes.Interface, error)
-	GetResource(ctx context.Context, params GetParams) (*unstructured.Unstructured, error)
-	GetResources(ctx context.Context, params ListParams) ([]*unstructured.Unstructured, error)
-}
-
 // Client is a struct that provides methods for interacting with Kubernetes clusters.
 type Client struct {
 	DynClientCreator func(*rest.Config) (dynamic.Interface, error)
@@ -78,7 +66,7 @@ func NewClient() *Client {
 
 // CreateClientSet creates a new Kubernetes clientset for the given Token and URL.
 func (c *Client) CreateClientSet(token string, url string, cluster string) (kubernetes.Interface, error) {
-	clusterID, err := getClusterId(c, token, url, cluster)
+	clusterID, err := c.getClusterId(token, url, cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +80,7 @@ func (c *Client) CreateClientSet(token string, url string, cluster string) (kube
 
 // GetResourceInterface returns a dynamic resource interface for the given Token, URL, Namespace, and GroupVersionResource.
 func (c *Client) GetResourceInterface(token string, url string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error) {
-	clusterID, err := getClusterId(c, token, url, cluster)
+	clusterID, err := c.getClusterId(token, url, cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -149,35 +137,6 @@ func (c *Client) GetResources(ctx context.Context, params ListParams) ([]*unstru
 	return objs, err
 }
 
-// createRestConfig creates a new rest.Config for the given Token and URL.
-func createRestConfig(token string, url string, clusterID string) (*rest.Config, error) {
-	clusterURL := url + "/k8s/clusters/" + clusterID
-	kubeconfig := clientcmdapi.NewConfig()
-	kubeconfig.Clusters["Cluster"] = &clientcmdapi.Cluster{
-		Server:                clusterURL,
-		InsecureSkipTLSVerify: os.Getenv(skipTLSVerifyEnvVar) == "true",
-	}
-	kubeconfig.AuthInfos["mcp"] = &clientcmdapi.AuthInfo{
-		Token: token,
-	}
-	kubeconfig.Contexts["Cluster"] = &clientcmdapi.Context{
-		Cluster:  "Cluster",
-		AuthInfo: "mcp",
-	}
-	kubeconfig.CurrentContext = "Cluster"
-	restConfig, err := clientcmd.NewNonInteractiveClientConfig(
-		*kubeconfig,
-		kubeconfig.CurrentContext,
-		&clientcmd.ConfigOverrides{},
-		nil,
-	).ClientConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	return restConfig, nil
-}
-
 // getClusterId returns the cluster's unique ID given either its cluster ID (metadata.name)
 // or its display name (spec.displayName). It uses local caches to avoid redundant lookups.
 //
@@ -188,7 +147,7 @@ func createRestConfig(token string, url string, clusterID string) (*rest.Config,
 //  4. If not found, fall back to listing all clusters and matching by display name.
 //
 // both cluster ID and display name are cached for future lookups.
-func getClusterId(c resourceInterface, token string, url string, clusterNameOrID string) (string, error) {
+func (c *Client) getClusterId(token string, url string, clusterNameOrID string) (string, error) {
 	// handle the special case for the local cluster, it always exists and is known by ID and displayName "local"
 	if clusterNameOrID == "local" {
 		return "local", nil
@@ -264,4 +223,33 @@ func getClusterId(c resourceInterface, token string, url string, clusterNameOrID
 	}
 
 	return clusterID, nil
+}
+
+// createRestConfig creates a new rest.Config for the given Token and URL.
+func createRestConfig(token string, url string, clusterID string) (*rest.Config, error) {
+	clusterURL := url + "/k8s/clusters/" + clusterID
+	kubeconfig := clientcmdapi.NewConfig()
+	kubeconfig.Clusters["Cluster"] = &clientcmdapi.Cluster{
+		Server:                clusterURL,
+		InsecureSkipTLSVerify: os.Getenv(skipTLSVerifyEnvVar) == "true",
+	}
+	kubeconfig.AuthInfos["mcp"] = &clientcmdapi.AuthInfo{
+		Token: token,
+	}
+	kubeconfig.Contexts["Cluster"] = &clientcmdapi.Context{
+		Cluster:  "Cluster",
+		AuthInfo: "mcp",
+	}
+	kubeconfig.CurrentContext = "Cluster"
+	restConfig, err := clientcmd.NewNonInteractiveClientConfig(
+		*kubeconfig,
+		kubeconfig.CurrentContext,
+		&clientcmd.ConfigOverrides{},
+		nil,
+	).ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	return restConfig, nil
 }

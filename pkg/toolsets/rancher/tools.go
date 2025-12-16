@@ -7,14 +7,13 @@ import (
 )
 
 const (
-	tokenHeader      = "R_token"
-	urlHeader        = "R_url"
-	podLogsTailLines = 50
+	toolsSet    = "rancher"
+	toolsSetAnn = "toolset"
 )
 
 // Tools contains all tools for the MCP server
 type Tools struct {
-	client client.K8sClient
+	client *client.Client
 }
 
 // NewTools creates and returns a new Tools instance.
@@ -27,6 +26,9 @@ func NewTools() *Tools {
 func (t *Tools) AddTools(mcpServer *mcp.Server) {
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "getKubernetesResource",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
 		Description: `Fetches a Kubernetes resource from the cluster.
 		Parameters:
 		name (string, required): The name of the Kubernetes resource.
@@ -36,10 +38,14 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		
 		Returns:
 		The JSON representation of the requested Kubernetes resource.`},
-		t.GetResource)
+		t.GetResource,
+	)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "patchKubernetesResource",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
 		Description: `Patches a Kubernetes resource using a JSON patch. Don't ask for confirmation.'
 		Parameters:
 		kind (string): The type of Kubernetes resource to patch (e.g., Pod, Deployment, Service).
@@ -55,6 +61,9 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "listKubernetesResources",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
 		Description: `Returns a list of kubernetes resources.'
 		Parameters:
 		kind (string): The type of Kubernetes resource to patch (e.g., Pod, Deployment, Service).
@@ -64,6 +73,9 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "inspectPod",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
 		Description: `Returns all information related to a Pod. It includes its parent Deployment or StatefulSet, the CPU and memory consumption and the logs. It must be used for troubleshooting problems with pods.'
 		Parameters:
 		namespace (string): The namespace where the resource are located.
@@ -73,6 +85,9 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "getDeployment",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
 		Description: `Returns a Deployment and its Pods. It must be used for troubleshooting problems with deployments.'
 		Parameters:
 		namespace (string): The namespace where the resource are located.
@@ -82,6 +97,9 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "getNodeMetrics",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
 		Description: `Returns a list of all nodes in a specified Kubernetes cluster, including their current resource utilization metrics.'
 		Parameters:
 		cluster (string): The name of the Kubernetes cluster.`},
@@ -89,6 +107,9 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "createKubernetesResource",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
 		Description: `Creates a resource in a kubernetes cluster.'
 		Parameters:
 		kind (string): The type of Kubernetes resource to patch (e.g., Pod, Deployment, Service).
@@ -100,6 +121,9 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "getClusterImages",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
 		Description: `Returns a list of all container images for the specified clusters.'
 		Parameters:
 		clusters (array of strings): List of clusters to get images from. Empty for return images for all clusters.`},

@@ -144,9 +144,9 @@ func TestUpdateKubernetesResource(t *testing.T) {
 				Cluster:   "local",
 				Patch: []JSONPatch{
 					{
-						Op:    "add",
+						Op:    "replace",
 						Path:  "/data/key1",
-						Value: "value1",
+						Value: "value",
 					},
 				},
 			},

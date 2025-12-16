@@ -207,8 +207,241 @@ func TestInspectPod(t *testing.T) {
 				Cluster:   "local",
 			},
 			fakeClientset: fake.NewSimpleClientset(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClient(inspectPodScheme(), fakePodForInspect, fakeReplicaSet, fakeDeploymentForInspect),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClient(inspectPodScheme()),
 			expectedError: `pods "nonexistent-pod" not found`,
+		},
+		"inspect pod - statefulset parent": {
+			params: specificResourceParams{
+				Name:      "stateful-pod-abc",
+				Namespace: "default",
+				Cluster:   "local",
+			},
+			fakeClientset: fake.NewSimpleClientset(),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClient(inspectPodScheme(),
+				&corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "stateful-pod-abc",
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion: "apps/v1",
+							Kind:       "ReplicaSet",
+							Name:       "stateful-rs",
+							Controller: ptr.To(true),
+						}},
+					},
+					Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "app", Image: "app:latest"}}},
+				},
+				&appsv1.ReplicaSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "stateful-rs",
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion: "apps/v1",
+							Kind:       "StatefulSet",
+							Name:       "my-statefulset",
+							Controller: ptr.To(true),
+						}},
+					},
+				},
+				&appsv1.StatefulSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my-statefulset",
+						Namespace: "default",
+					},
+				},
+			),
+			expectedResult: `{
+				"llm": [
+					{
+						"apiVersion": "v1",
+						"kind": "Pod",
+						"metadata": {
+							"name": "stateful-pod-abc",
+							"namespace": "default",
+							"ownerReferences": [
+								{
+									"apiVersion": "apps/v1",
+									"controller": true,
+									"kind": "ReplicaSet",
+									"name": "stateful-rs",
+									"uid": ""
+								}
+							]
+						},
+						"spec": {
+							"containers": [
+								{
+									"image": "app:latest",
+									"name": "app",
+									"resources": {}
+								}
+							]
+						},
+						"status": {}
+					},
+					{
+						"apiVersion": "apps/v1",
+						"kind": "StatefulSet",
+						"metadata": {
+							"name": "my-statefulset",
+							"namespace": "default"
+						},
+						"spec": {
+							"selector": null,
+							"serviceName": "",
+							"template": {
+								"metadata": {},
+								"spec": {
+									"containers": null
+								}
+							},
+							"updateStrategy": {}
+						},
+						"status": {
+							"availableReplicas": 0,
+							"replicas": 0
+						}
+					},
+					{
+						"pod-logs": {
+							"app": "fake logs"
+						}
+					}
+				],
+				"uiContext": [
+					{
+						"cluster": "local",
+						"kind": "Pod",
+						"name": "stateful-pod-abc",
+						"namespace": "default",
+						"type": "pod"
+					},
+					{
+						"cluster": "local",
+						"kind": "StatefulSet",
+						"name": "my-statefulset",
+						"namespace": "default",
+						"type": "apps.statefulset"
+					}
+				]
+			}`,
+		},
+		"inspect pod - daemonset parent": {
+			params: specificResourceParams{
+				Name:      "daemon-pod-xyz",
+				Namespace: "default",
+				Cluster:   "local",
+			},
+			fakeClientset: fake.NewSimpleClientset(),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClient(inspectPodScheme(),
+				&corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "daemon-pod-xyz",
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion: "apps/v1",
+							Kind:       "ReplicaSet",
+							Name:       "daemon-rs",
+							Controller: ptr.To(true),
+						}},
+					},
+					Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "daemon", Image: "daemon:latest"}}},
+				},
+				&appsv1.ReplicaSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "daemon-rs",
+						Namespace: "default",
+						OwnerReferences: []metav1.OwnerReference{{
+							APIVersion: "apps/v1",
+							Kind:       "DaemonSet",
+							Name:       "my-daemonset",
+							Controller: ptr.To(true),
+						}},
+					},
+				},
+				&appsv1.DaemonSet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my-daemonset",
+						Namespace: "default",
+					},
+				},
+			),
+			expectedResult: `{
+				"llm": [
+					{
+						"apiVersion": "v1",
+						"kind": "Pod",
+						"metadata": {
+							"name": "daemon-pod-xyz",
+							"namespace": "default",
+							"ownerReferences": [
+								{
+									"apiVersion": "apps/v1",
+									"controller": true,
+									"kind": "ReplicaSet",
+									"name": "daemon-rs",
+									"uid": ""
+								}
+							]
+						},
+						"spec": {
+							"containers": [
+								{
+									"image": "daemon:latest",
+									"name": "daemon",
+									"resources": {}
+								}
+							]
+						},
+						"status": {}
+					},
+					{
+						"apiVersion": "apps/v1",
+						"kind": "DaemonSet",
+						"metadata": {
+							"name": "my-daemonset",
+							"namespace": "default"
+						},
+						"spec": {
+							"selector": null,
+							"template": {
+								"metadata": {},
+								"spec": {
+									"containers": null
+								}
+							},
+							"updateStrategy": {}
+						},
+						"status": {
+							"currentNumberScheduled": 0,
+							"desiredNumberScheduled": 0,
+							"numberMisscheduled": 0,
+							"numberReady": 0
+						}
+					},
+					{
+						"pod-logs": {
+							"daemon": "fake logs"
+						}
+					}
+				],
+				"uiContext": [
+					{
+						"cluster": "local",
+						"kind": "Pod",
+						"name": "daemon-pod-xyz",
+						"namespace": "default",
+						"type": "pod"
+					},
+					{
+						"cluster": "local",
+						"kind": "DaemonSet",
+						"name": "my-daemonset",
+						"namespace": "default",
+						"type": "apps.daemonset"
+					}
+				]
+			}`,
 		},
 	}
 
