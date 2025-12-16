@@ -17,9 +17,9 @@ type Tools struct {
 }
 
 // NewTools creates and returns a new Tools instance.
-func NewTools() *Tools {
+func NewTools(client *client.Client) *Tools {
 	return &Tools{
-		client: client.NewClient(),
+		client: client,
 	}
 }
 

@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 
@@ -20,13 +19,12 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
-const skipTLSVerifyEnvVar = "INSECURE_SKIP_TLS"
-
 var clusterIdsCache = sync.Map{}
 var clustersDisplayNameToIDCache = sync.Map{}
 
 // Client is a struct that provides methods for interacting with Kubernetes clusters.
 type Client struct {
+	insecure         bool
 	DynClientCreator func(*rest.Config) (dynamic.Interface, error)
 	ClientSetCreator func(*rest.Config) (kubernetes.Interface, error)
 }
@@ -53,8 +51,9 @@ type ListParams struct {
 }
 
 // NewClient creates and returns a new instance of the Client struct.
-func NewClient() *Client {
+func NewClient(insecure bool) *Client {
 	return &Client{
+		insecure: insecure,
 		DynClientCreator: func(cfg *rest.Config) (dynamic.Interface, error) {
 			return dynamic.NewForConfig(cfg)
 		},
@@ -70,7 +69,7 @@ func (c *Client) CreateClientSet(token string, url string, cluster string) (kube
 	if err != nil {
 		return nil, err
 	}
-	restConfig, err := createRestConfig(token, url, clusterID)
+	restConfig, err := c.createRestConfig(token, url, clusterID)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +83,7 @@ func (c *Client) GetResourceInterface(token string, url string, namespace string
 	if err != nil {
 		return nil, err
 	}
-	restConfig, err := createRestConfig(token, url, clusterID)
+	restConfig, err := c.createRestConfig(token, url, clusterID)
 	if err != nil {
 		return nil, err
 	}
@@ -231,12 +230,12 @@ func (c *Client) getClusterId(token string, url string, clusterNameOrID string) 
 
 // createRestConfig creates a new rest.Config for accessing a Kubernetes cluster through Rancher.
 // It configures the cluster URL, authentication token, and TLS settings based on environment variables.
-func createRestConfig(token string, url string, clusterID string) (*rest.Config, error) {
+func (c *Client) createRestConfig(token string, url string, clusterID string) (*rest.Config, error) {
 	clusterURL := url + "/k8s/clusters/" + clusterID
 	kubeconfig := clientcmdapi.NewConfig()
 	kubeconfig.Clusters["Cluster"] = &clientcmdapi.Cluster{
 		Server:                clusterURL,
-		InsecureSkipTLSVerify: os.Getenv(skipTLSVerifyEnvVar) == "true",
+		InsecureSkipTLSVerify: c.insecure,
 	}
 	kubeconfig.AuthInfos["mcp"] = &clientcmdapi.AuthInfo{
 		Token: token,

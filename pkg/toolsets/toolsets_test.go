@@ -1,6 +1,7 @@
 package toolsets
 
 import (
+	"mcp/pkg/client"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -9,13 +10,7 @@ import (
 )
 
 func TestNewToolSetsWithAllTools(t *testing.T) {
-	server := mcp.NewServer(&mcp.Implementation{
-		Name:    "test-server",
-		Version: "v1.0.0",
-	}, nil)
-	assert.NotNil(t, server)
-
-	toolsets := NewToolSetsWithAllTools(server)
+	toolsets := NewToolSetsWithAllTools(client.NewClient(true))
 
 	assert.NotNil(t, toolsets)
 	assert.Equal(t, 1, len(toolsets.toolsAdders))

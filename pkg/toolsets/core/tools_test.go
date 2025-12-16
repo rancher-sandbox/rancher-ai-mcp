@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"mcp/pkg/client"
 	"net"
 	"net/http"
 	"testing"
@@ -11,14 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewTools(t *testing.T) {
-	tools := NewTools()
-	assert.NotNil(t, tools)
-	assert.NotNil(t, tools.client)
-}
-
 func TestAddTools(t *testing.T) {
-	tools := NewTools()
+	tools := NewTools(client.NewClient(true))
 
 	// Create a test MCP server
 	mcpServer := mcp.NewServer(&mcp.Implementation{

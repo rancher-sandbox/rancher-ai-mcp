@@ -1,6 +1,7 @@
 package toolsets
 
 import (
+	"mcp/pkg/client"
 	"mcp/pkg/toolsets/core"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -17,10 +18,10 @@ type ToolSets struct {
 }
 
 // NewToolSetsWithAllTools creates a new ToolSets instance with all available toolsets initialized.
-func NewToolSetsWithAllTools(mcpServer *mcp.Server) *ToolSets {
+func NewToolSetsWithAllTools(client *client.Client) *ToolSets {
 	toolSets := &ToolSets{}
 
-	toolSets.toolsAdders = []toolsAdder{core.NewTools()}
+	toolSets.toolsAdders = []toolsAdder{core.NewTools(client)}
 
 	return toolSets
 }
