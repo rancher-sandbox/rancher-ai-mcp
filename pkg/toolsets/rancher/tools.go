@@ -23,6 +23,8 @@ func NewTools() *Tools {
 	}
 }
 
+// AddTools registers all Rancher Kubernetes tools with the provided MCP server.
+// Each tool is configured with metadata identifying it as part of the rancher toolset.
 func (t *Tools) AddTools(mcpServer *mcp.Server) {
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "getKubernetesResource",

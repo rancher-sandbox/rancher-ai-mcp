@@ -73,6 +73,8 @@ func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string) (strin
 	return string(bytes), nil
 }
 
+// removeManagedFieldsIfPresent removes the managedFields from the metadata of an unstructured object.
+// This helps reduce payload size and removes data that is not relevant for LLM processing.
 func removeManagedFieldsIfPresent(obj *unstructured.Unstructured) {
 	if obj == nil || obj.Object == nil {
 		return

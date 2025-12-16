@@ -16,6 +16,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
+// JSONPatch represents a JSON Patch operation as defined in RFC 6902.
+// It specifies an operation (add, remove, replace, etc.) to be applied to a JSON document.
 type JSONPatch struct {
 	Op    string `json:"op"`
 	Path  string `json:"path"`

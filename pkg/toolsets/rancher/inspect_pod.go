@@ -140,6 +140,9 @@ func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 	}, nil, nil
 }
 
+// getPodLogs retrieves the logs for all containers in a pod.
+// It returns the logs as an unstructured object with container names as keys.
+// Only the last 50 lines of logs are retrieved per container to limit payload size.
 func (t *Tools) getPodLogs(ctx context.Context, url string, cluster string, token string, pod corev1.Pod) (*unstructured.Unstructured, error) {
 	clientset, err := t.client.CreateClientSet(token, url, cluster)
 	if err != nil {

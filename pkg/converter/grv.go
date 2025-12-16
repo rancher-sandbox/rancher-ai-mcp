@@ -2,6 +2,9 @@ package converter
 
 import "k8s.io/apimachinery/pkg/runtime/schema"
 
+// K8sKindsToGVRs maps lowercase Kubernetes resource kind names to their corresponding
+// GroupVersionResource (GVR) identifiers. This mapping is used for dynamic client operations
+// to resolve resource types across different API groups and versions.
 var K8sKindsToGVRs = map[string]schema.GroupVersionResource{
 	// --- CORE Kubernetes Resources (Group: "") ---
 	"pod":                   {Group: "", Version: "v1", Resource: "pods"},

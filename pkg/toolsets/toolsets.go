@@ -6,14 +6,17 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+// toolsAdder is an interface for types that can add tools to an MCP server.
 type toolsAdder interface {
 	AddTools(mcpServer *mcp.Server)
 }
 
+// ToolSets manages a collection of tool adders for the MCP server.
 type ToolSets struct {
 	toolsAdders []toolsAdder
 }
 
+// NewToolSetsWithAllTools creates a new ToolSets instance with all available toolsets initialized.
 func NewToolSetsWithAllTools(mcpServer *mcp.Server) *ToolSets {
 	toolSets := &ToolSets{}
 
@@ -22,6 +25,7 @@ func NewToolSetsWithAllTools(mcpServer *mcp.Server) *ToolSets {
 	return toolSets
 }
 
+// AddTools registers all tools from all toolsets to the provided MCP server.
 func (t *ToolSets) AddTools(mcpServer *mcp.Server) {
 	for _, ta := range t.toolsAdders {
 		ta.AddTools(mcpServer)

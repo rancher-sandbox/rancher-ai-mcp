@@ -100,6 +100,8 @@ func (c *Client) GetResourceInterface(token string, url string, namespace string
 	return resourceInterface, nil
 }
 
+// GetResource retrieves a single Kubernetes resource by name.
+// It returns the resource as an unstructured object or an error if the resource is not found.
 func (c *Client) GetResource(ctx context.Context, params GetParams) (*unstructured.Unstructured, error) {
 	resourceInterface, err := c.GetResourceInterface(params.Token, params.URL, params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
 	if err != nil {
@@ -114,6 +116,8 @@ func (c *Client) GetResource(ctx context.Context, params GetParams) (*unstructur
 	return obj, err
 }
 
+// GetResources lists Kubernetes resources matching the provided parameters.
+// It supports optional label selectors for filtering and returns a slice of unstructured objects.
 func (c *Client) GetResources(ctx context.Context, params ListParams) ([]*unstructured.Unstructured, error) {
 	resourceInterface, err := c.GetResourceInterface(params.Token, params.URL, params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
 	if err != nil {
@@ -225,7 +229,8 @@ func (c *Client) getClusterId(token string, url string, clusterNameOrID string) 
 	return clusterID, nil
 }
 
-// createRestConfig creates a new rest.Config for the given Token and URL.
+// createRestConfig creates a new rest.Config for accessing a Kubernetes cluster through Rancher.
+// It configures the cluster URL, authentication token, and TLS settings based on environment variables.
 func createRestConfig(token string, url string, clusterID string) (*rest.Config, error) {
 	clusterURL := url + "/k8s/clusters/" + clusterID
 	kubeconfig := clientcmdapi.NewConfig()
