@@ -1,7 +1,7 @@
 package toolsets
 
 import (
-	"mcp/pkg/toolsets/rancher"
+	"mcp/pkg/toolsets/core"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -20,7 +20,7 @@ type ToolSets struct {
 func NewToolSetsWithAllTools(mcpServer *mcp.Server) *ToolSets {
 	toolSets := &ToolSets{}
 
-	toolSets.toolsAdders = []toolsAdder{rancher.NewTools()}
+	toolSets.toolsAdders = []toolsAdder{core.NewTools()}
 
 	return toolSets
 }

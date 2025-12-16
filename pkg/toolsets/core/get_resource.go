@@ -1,4 +1,4 @@
-package rancher
+package core
 
 import (
 	"context"
@@ -8,32 +8,35 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-// ListKubernetesResourcesParams specifies the parameters needed to list kubernetes resources.
-type ListKubernetesResourcesParams struct {
+// resourceParams uniquely identifies a specific named resource within a cluster.
+type resourceParams struct {
+	Name      string `json:"name" jsonschema:"the name of k8s resource"`
 	Namespace string `json:"namespace" jsonschema:"the namespace of the resource"`
 	Kind      string `json:"kind" jsonschema:"the kind of the resource"`
 	Cluster   string `json:"cluster" jsonschema:"the cluster of the resource"`
 }
 
-// ListKubernetesResources lists Kubernetes resources of a specific kind and namespace.
-func (t *Tools) ListKubernetesResources(ctx context.Context, toolReq *mcp.CallToolRequest, params ListKubernetesResourcesParams) (*mcp.CallToolResult, any, error) {
-	zap.L().Debug("listKubernetesResource called")
+// GetResource retrieves a specific Kubernetes resource based on the provided parameters.
+func (t *Tools) GetResource(ctx context.Context, toolReq *mcp.CallToolRequest, params resourceParams) (*mcp.CallToolResult, any, error) {
+	zap.L().Debug("getKubernetesResource called")
 
-	resources, err := t.client.GetResources(ctx, client.ListParams{
+	resource, err := t.client.GetResource(ctx, client.GetParams{
 		Cluster:   params.Cluster,
 		Kind:      params.Kind,
 		Namespace: params.Namespace,
+		Name:      params.Name,
 		URL:       toolReq.Extra.Header.Get(urlHeader),
 		Token:     toolReq.Extra.Header.Get(tokenHeader),
 	})
 	if err != nil {
-		zap.L().Error("failed to list resources", zap.String("tool", "listKubernetesResource"), zap.Error(err))
+		zap.L().Error("failed to get resource", zap.String("tool", "getKubernetesResource"), zap.Error(err))
 		return nil, nil, err
 	}
 
-	mcpResponse, err := response.CreateMcpResponse(resources, params.Cluster)
+	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{resource}, params.Cluster)
 	if err != nil {
 		zap.L().Error("failed to create mcp response", zap.String("tool", "listKubernetesResource"), zap.Error(err))
 		return nil, nil, err

@@ -1,4 +1,4 @@
-package rancher
+package core
 
 import (
 	"bytes"
