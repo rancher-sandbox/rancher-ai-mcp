@@ -46,7 +46,6 @@ func init() {
 }
 
 func runServe(cmd *cobra.Command, args []string) {
-
 	mcpServer := mcp.NewServer(&mcp.Implementation{Name: "rancher mcp server", Version: "v1.0.0"}, nil)
 	client := client.NewClient(insecure)
 

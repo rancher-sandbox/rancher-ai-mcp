@@ -15,7 +15,7 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:   "mcp",
-	Short: "MCP server for Rancher AI agent",
+	Short: "Rancher Model Context Protocol (MCP) Server",
 	Long: `The MCP server allows the Rancher AI agent to securely retrieve 
 or update Kubernetes and Rancher resources across local and downstream clusters.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {

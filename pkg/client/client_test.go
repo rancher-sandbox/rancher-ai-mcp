@@ -47,6 +47,8 @@ func TestGetClusterId(t *testing.T) {
 	tests := map[string]struct {
 		clusterNameOrIDInput                 string
 		fakeDynClient                        *dynamicfake.FakeDynamicClient
+		clusterIdsCache                      map[string]any
+		clustersDisplayNameToIDCache         map[string]any
 		expectedClusterIdsCache              map[string]any
 		expectedClustersDisplayNameToIDCache map[string]any
 		expectedID                           string
@@ -63,6 +65,26 @@ func TestGetClusterId(t *testing.T) {
 		"should return clusterID if input is a cluster displayName": {
 			clusterNameOrIDInput:                 clusterDN,
 			fakeDynClient:                        dynamicfake.NewSimpleDynamicClient(scheme(), newFakeCluster(clusterID, clusterDN)),
+			expectedClusterIdsCache:              map[string]any{clusterID: struct{}{}},
+			expectedClustersDisplayNameToIDCache: map[string]any{clusterDN: clusterID},
+			expectedID:                           clusterID,
+		},
+
+		"should return clusterID if clusterID is in the cache": {
+			clusterNameOrIDInput:                 clusterID,
+			clusterIdsCache:                      map[string]any{clusterID: struct{}{}},
+			clustersDisplayNameToIDCache:         map[string]any{clusterDN: clusterID},
+			fakeDynClient:                        dynamicfake.NewSimpleDynamicClient(scheme()),
+			expectedClusterIdsCache:              map[string]any{clusterID: struct{}{}},
+			expectedClustersDisplayNameToIDCache: map[string]any{clusterDN: clusterID},
+			expectedID:                           clusterID,
+		},
+
+		"should return clusterID if displayName is in the cache": {
+			clusterNameOrIDInput:                 clusterDN,
+			clusterIdsCache:                      map[string]any{clusterID: struct{}{}},
+			clustersDisplayNameToIDCache:         map[string]any{clusterDN: clusterID},
+			fakeDynClient:                        dynamicfake.NewSimpleDynamicClient(scheme()),
 			expectedClusterIdsCache:              map[string]any{clusterID: struct{}{}},
 			expectedClustersDisplayNameToIDCache: map[string]any{clusterDN: clusterID},
 			expectedID:                           clusterID,
@@ -87,7 +109,17 @@ func TestGetClusterId(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			clusterIdsCache = sync.Map{}
+			if test.clusterIdsCache != nil {
+				for key, value := range test.clusterIdsCache {
+					clusterIdsCache.Store(key, value)
+				}
+			}
 			clustersDisplayNameToIDCache = sync.Map{}
+			if test.clustersDisplayNameToIDCache != nil {
+				for key, value := range test.clustersDisplayNameToIDCache {
+					clustersDisplayNameToIDCache.Store(key, value)
+				}
+			}
 
 			c := &Client{
 				DynClientCreator: func(inConfig *rest.Config) (dynamic.Interface, error) {
