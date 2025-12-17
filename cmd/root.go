@@ -35,13 +35,7 @@ func init() {
 }
 
 func initLogger() {
-	// Check both flag and environment variable
-	level := logLevel
-	if level == "" {
-		level = os.Getenv("LOG_LEVEL")
-	}
-
-	if strings.ToLower(level) == "debug" {
+	if strings.ToLower(logLevel) == "debug" {
 		zap.ReplaceGlobals(zap.Must(zap.NewDevelopment()))
 	} else {
 		config := zap.NewProductionConfig()
