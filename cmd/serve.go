@@ -42,15 +42,14 @@ func init() {
 	rootCmd.AddCommand(serveCmd)
 
 	serveCmd.Flags().IntVar(&port, "port", 9092, "Port to listen on")
-	serveCmd.Flags().BoolVar(&insecure, "insecure", false, "Skip TLS verification (uses INSECURE_SKIP_TLS env var if not set)")
+	serveCmd.Flags().BoolVar(&insecure, "insecure", false, "Skip TLS verification")
 }
 
 func runServe(cmd *cobra.Command, args []string) {
 	mcpServer := mcp.NewServer(&mcp.Implementation{Name: "rancher mcp server", Version: "v1.0.0"}, nil)
 	client := client.NewClient(insecure)
 
-	toolsets := toolsets.NewToolSetsWithAllTools(client)
-	toolsets.AddTools(mcpServer)
+	toolsets.AddAllTools(client, mcpServer)
 
 	handler := mcp.NewStreamableHTTPHandler(func(request *http.Request) *mcp.Server {
 		return mcpServer
