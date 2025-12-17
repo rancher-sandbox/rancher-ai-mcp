@@ -64,8 +64,8 @@ func NewClient(insecure bool) *Client {
 }
 
 // CreateClientSet creates a new Kubernetes clientset for the given Token and URL.
-func (c *Client) CreateClientSet(token string, url string, cluster string) (kubernetes.Interface, error) {
-	clusterID, err := c.getClusterId(token, url, cluster)
+func (c *Client) CreateClientSet(ctx context.Context, token string, url string, cluster string) (kubernetes.Interface, error) {
+	clusterID, err := c.getClusterId(ctx, token, url, cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -78,8 +78,8 @@ func (c *Client) CreateClientSet(token string, url string, cluster string) (kube
 }
 
 // GetResourceInterface returns a dynamic resource interface for the given Token, URL, Namespace, and GroupVersionResource.
-func (c *Client) GetResourceInterface(token string, url string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error) {
-	clusterID, err := c.getClusterId(token, url, cluster)
+func (c *Client) GetResourceInterface(ctx context.Context, token string, url string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error) {
+	clusterID, err := c.getClusterId(ctx, token, url, cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +102,7 @@ func (c *Client) GetResourceInterface(token string, url string, namespace string
 // GetResource retrieves a single Kubernetes resource by name.
 // It returns the resource as an unstructured object or an error if the resource is not found.
 func (c *Client) GetResource(ctx context.Context, params GetParams) (*unstructured.Unstructured, error) {
-	resourceInterface, err := c.GetResourceInterface(params.Token, params.URL, params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
+	resourceInterface, err := c.GetResourceInterface(ctx, params.Token, params.URL, params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func (c *Client) GetResource(ctx context.Context, params GetParams) (*unstructur
 // GetResources lists Kubernetes resources matching the provided parameters.
 // It supports optional label selectors for filtering and returns a slice of unstructured objects.
 func (c *Client) GetResources(ctx context.Context, params ListParams) ([]*unstructured.Unstructured, error) {
-	resourceInterface, err := c.GetResourceInterface(params.Token, params.URL, params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
+	resourceInterface, err := c.GetResourceInterface(ctx, params.Token, params.URL, params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +150,7 @@ func (c *Client) GetResources(ctx context.Context, params ListParams) ([]*unstru
 //  4. If not found, fall back to listing all clusters and matching by display name.
 //
 // both cluster ID and display name are cached for future lookups.
-func (c *Client) getClusterId(token string, url string, clusterNameOrID string) (string, error) {
+func (c *Client) getClusterId(ctx context.Context, token string, url string, clusterNameOrID string) (string, error) {
 	// handle the special case for the local cluster, it always exists and is known by ID and displayName "local"
 	if clusterNameOrID == "local" {
 		return "local", nil
@@ -167,19 +167,19 @@ func (c *Client) getClusterId(token string, url string, clusterNameOrID string) 
 	}
 
 	// try to fetch the cluster directly by its ID
-	clusterInterface, err := c.GetResourceInterface(token, url, "", "local", converter.K8sKindsToGVRs["cluster"])
+	clusterInterface, err := c.GetResourceInterface(ctx, token, url, "", "local", converter.K8sKindsToGVRs["cluster"])
 	if err != nil {
 		return "", err
 	}
 
-	cluster, err := clusterInterface.Get(context.Background(), clusterNameOrID, metav1.GetOptions{})
+	cluster, err := clusterInterface.Get(ctx, clusterNameOrID, metav1.GetOptions{})
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			return "", err
 		}
 
 		// If not found by ID, try to locate it by display name.
-		clusters, err := clusterInterface.List(context.Background(), metav1.ListOptions{})
+		clusters, err := clusterInterface.List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return "", err
 		}

@@ -38,7 +38,7 @@ type UpdateKubernetesResourceParams struct {
 func (t *Tools) UpdateKubernetesResource(ctx context.Context, toolReq *mcp.CallToolRequest, params UpdateKubernetesResourceParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("updateKubernetesResource called")
 
-	resourceInterface, err := t.client.GetResourceInterface(toolReq.Extra.Header.Get(tokenHeader), toolReq.Extra.Header.Get(urlHeader), params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
+	resourceInterface, err := t.client.GetResourceInterface(ctx, toolReq.Extra.Header.Get(tokenHeader), toolReq.Extra.Header.Get(urlHeader), params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
 	if err != nil {
 		return nil, nil, err
 	}
