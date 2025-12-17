@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -26,7 +25,7 @@ or update Kubernetes and Rancher resources across local and downstream clusters.
 // Execute runs the root command
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		os.Exit(1)
+		cobra.CheckErr(err)
 	}
 }
 
