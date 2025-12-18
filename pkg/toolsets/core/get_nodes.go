@@ -15,8 +15,8 @@ type getNodesParams struct {
 	Cluster string `json:"cluster" jsonschema:"the cluster of the resource"`
 }
 
-// GetNodes retrieves information and metrics for all nodes in a given cluster.
-func (t *Tools) GetNodes(ctx context.Context, toolReq *mcp.CallToolRequest, params getNodesParams) (*mcp.CallToolResult, any, error) {
+// getNodes retrieves information and metrics for all nodes in a given cluster.
+func (t *Tools) getNodes(ctx context.Context, toolReq *mcp.CallToolRequest, params getNodesParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("getNodes called")
 
 	nodeResource, err := t.client.GetResources(ctx, client.ListParams{

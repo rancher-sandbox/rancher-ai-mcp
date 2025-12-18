@@ -105,7 +105,7 @@ func TestCreateKubernetesResource(t *testing.T) {
 			}
 			tools := Tools{client: c}
 
-			result, _, err := tools.CreateKubernetesResource(context.TODO(), &mcp.CallToolRequest{
+			result, _, err := tools.createKubernetesResource(context.TODO(), &mcp.CallToolRequest{
 				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}, tokenHeader: {fakeToken}}},
 			}, test.params)
 

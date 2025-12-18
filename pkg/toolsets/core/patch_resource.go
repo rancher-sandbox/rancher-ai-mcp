@@ -16,26 +16,26 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// JSONPatch represents a JSON Patch operation as defined in RFC 6902.
+// jsonPatch represents a JSON Patch operation as defined in RFC 6902.
 // It specifies an operation (add, remove, replace, etc.) to be applied to a JSON document.
-type JSONPatch struct {
+type jsonPatch struct {
 	Op    string `json:"op"`
 	Path  string `json:"path"`
 	Value any    `json:"value,omitempty"`
 }
 
-// UpdateKubernetesResourceParams defines the structure for updating a general Kubernetes resource.
+// updateKubernetesResourceParams defines the structure for updating a general Kubernetes resource.
 // It includes fields required to uniquely identify a resource within a cluster.
-type UpdateKubernetesResourceParams struct {
+type updateKubernetesResourceParams struct {
 	Name      string      `json:"name" jsonschema:"the name of k8s resource"`
 	Namespace string      `json:"namespace" jsonschema:"the namespace of the resource"`
 	Kind      string      `json:"kind" jsonschema:"the kind of the resource"`
 	Cluster   string      `json:"cluster" jsonschema:"the cluster of the resource"`
-	Patch     []JSONPatch `json:"patch" jsonschema:"the patch of the request"`
+	Patch     []jsonPatch `json:"patch" jsonschema:"the patch of the request"`
 }
 
-// UpdateKubernetesResource updates a specific Kubernetes resource using a JSON patch.
-func (t *Tools) UpdateKubernetesResource(ctx context.Context, toolReq *mcp.CallToolRequest, params UpdateKubernetesResourceParams) (*mcp.CallToolResult, any, error) {
+// updateKubernetesResource updates a specific Kubernetes resource using a JSON patch.
+func (t *Tools) updateKubernetesResource(ctx context.Context, toolReq *mcp.CallToolRequest, params updateKubernetesResourceParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("updateKubernetesResource called")
 
 	resourceInterface, err := t.client.GetResourceInterface(ctx, toolReq.Extra.Header.Get(tokenHeader), toolReq.Extra.Header.Get(urlHeader), params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])

@@ -64,13 +64,13 @@ func TestListKubernetesResources(t *testing.T) {
 	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
-		params         ListKubernetesResourcesParams
+		params         listKubernetesResourcesParams
 		fakeDynClient  *dynamicfake.FakeDynamicClient
 		expectedResult string
 		expectedError  string
 	}{
 		"list pods in namespace": {
-			params: ListKubernetesResourcesParams{
+			params: listKubernetesResourcesParams{
 				Kind:      "pod",
 				Namespace: "default",
 				Cluster:   "local",
@@ -94,7 +94,7 @@ func TestListKubernetesResources(t *testing.T) {
 			}`,
 		},
 		"list pods - empty namespace": {
-			params: ListKubernetesResourcesParams{
+			params: listKubernetesResourcesParams{
 				Kind:      "pod",
 				Namespace: "kube-system",
 				Cluster:   "local",
@@ -115,7 +115,7 @@ func TestListKubernetesResources(t *testing.T) {
 			}
 			tools := Tools{client: c}
 
-			result, _, err := tools.ListKubernetesResources(context.TODO(), &mcp.CallToolRequest{
+			result, _, err := tools.listKubernetesResources(context.TODO(), &mcp.CallToolRequest{
 				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}, tokenHeader: {fakeToken}}},
 			}, test.params)
 

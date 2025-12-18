@@ -19,8 +19,8 @@ type resourceParams struct {
 	Cluster   string `json:"cluster" jsonschema:"the cluster of the resource"`
 }
 
-// GetResource retrieves a specific Kubernetes resource based on the provided parameters.
-func (t *Tools) GetResource(ctx context.Context, toolReq *mcp.CallToolRequest, params resourceParams) (*mcp.CallToolResult, any, error) {
+// getResource retrieves a specific Kubernetes resource based on the provided parameters.
+func (t *Tools) getResource(ctx context.Context, toolReq *mcp.CallToolRequest, params resourceParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("getKubernetesResource called")
 
 	resource, err := t.client.GetResource(ctx, client.GetParams{

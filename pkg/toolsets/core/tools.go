@@ -40,7 +40,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		
 		Returns:
 		The JSON representation of the requested Kubernetes resource.`},
-		t.GetResource,
+		t.getResource,
 	)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -59,7 +59,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		
 		Example of the patch parameter:
 		[{"op": "replace", "path": "/spec/replicas", "value": 3}]`},
-		t.UpdateKubernetesResource)
+		t.updateKubernetesResource)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "listKubernetesResources",
@@ -71,7 +71,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		kind (string): The type of Kubernetes resource to patch (e.g., Pod, Deployment, Service).
 		namespace (string): The namespace where the resource are located. It must be empty for all namespaces or cluster-wide resources.
 		cluster (string): The name of the Kubernetes cluster.`},
-		t.ListKubernetesResources)
+		t.listKubernetesResources)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "inspectPod",
@@ -83,7 +83,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		namespace (string): The namespace where the resource are located.
 		cluster (string): The name of the Kubernetes cluster.
 		name (string): The name of the Pod.`},
-		t.InspectPod)
+		t.inspectPod)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "getDeployment",
@@ -95,7 +95,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		namespace (string): The namespace where the resource are located.
 		cluster (string): The name of the Kubernetes cluster.
 		name (string): The name of the Deployment.`},
-		t.GetDeploymentDetails)
+		t.getDeploymentDetails)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "getNodeMetrics",
@@ -105,7 +105,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Description: `Returns a list of all nodes in a specified Kubernetes cluster, including their current resource utilization metrics.'
 		Parameters:
 		cluster (string): The name of the Kubernetes cluster.`},
-		t.GetNodes)
+		t.getNodes)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "createKubernetesResource",
@@ -119,7 +119,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		name (string): The name of the specific resource to patch.
 		cluster (string): The name of the Kubernetes cluster. Empty for single container pods.
 		resource (json): Resource to be created. This must be a JSON object.`},
-		t.CreateKubernetesResource)
+		t.createKubernetesResource)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "getClusterImages",
@@ -129,5 +129,5 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Description: `Returns a list of all container images for the specified clusters.'
 		Parameters:
 		clusters (array of strings): List of clusters to get images from. Empty for return images for all clusters.`},
-		t.GetClusterImages)
+		t.getClusterImages)
 }

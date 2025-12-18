@@ -22,13 +22,13 @@ const (
 	podLogsTailLines = 50
 )
 
-// ContainerLogs holds logs for multiple containers.
-type ContainerLogs struct {
+// containerLogs holds logs for multiple containers.
+type containerLogs struct {
 	Logs map[string]any `json:"logs"`
 }
 
-// InspectPod retrieves detailed information about a specific pod, its owner, metrics, and logs.
-func (t *Tools) InspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, params specificResourceParams) (*mcp.CallToolResult, any, error) {
+// inspectPod retrieves detailed information about a specific pod, its owner, metrics, and logs.
+func (t *Tools) inspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, params specificResourceParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("inspectPod called")
 
 	podResource, err := t.client.GetResource(ctx, client.GetParams{
@@ -148,7 +148,7 @@ func (t *Tools) getPodLogs(ctx context.Context, url string, cluster string, toke
 	if err != nil {
 		return nil, fmt.Errorf("failed to create clientset: %w", err)
 	}
-	logs := ContainerLogs{
+	logs := containerLogs{
 		Logs: make(map[string]any),
 	}
 	for _, container := range pod.Spec.Containers {

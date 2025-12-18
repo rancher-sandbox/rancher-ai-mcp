@@ -17,7 +17,7 @@ type getClusterImagesParams struct {
 	Clusters []string `json:"clusters" jsonschema:"the clusters where images are returned"`
 }
 
-func (t *Tools) GetClusterImages(ctx context.Context, toolReq *mcp.CallToolRequest, params getClusterImagesParams) (*mcp.CallToolResult, any, error) {
+func (t *Tools) getClusterImages(ctx context.Context, toolReq *mcp.CallToolRequest, params getClusterImagesParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("getClusterImages called")
 
 	var clusters []string

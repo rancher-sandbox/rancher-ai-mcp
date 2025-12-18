@@ -22,8 +22,8 @@ type specificResourceParams struct {
 	Cluster   string `json:"cluster" jsonschema:"the cluster of the resource"`
 }
 
-// GetDeploymentDetails retrieves details about a deployment and its associated pods.
-func (t *Tools) GetDeploymentDetails(ctx context.Context, toolReq *mcp.CallToolRequest, params specificResourceParams) (*mcp.CallToolResult, any, error) {
+// getDeploymentDetails retrieves details about a deployment and its associated pods.
+func (t *Tools) getDeploymentDetails(ctx context.Context, toolReq *mcp.CallToolRequest, params specificResourceParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("getDeploymentDetails called")
 
 	deploymentResource, err := t.client.GetResource(ctx, client.GetParams{

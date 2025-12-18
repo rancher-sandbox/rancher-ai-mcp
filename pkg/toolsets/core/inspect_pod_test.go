@@ -457,7 +457,7 @@ func TestInspectPod(t *testing.T) {
 			}
 			tools := Tools{client: c}
 
-			result, _, err := tools.InspectPod(context.TODO(), &mcp.CallToolRequest{
+			result, _, err := tools.inspectPod(context.TODO(), &mcp.CallToolRequest{
 				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}, tokenHeader: {fakeToken}}},
 			}, test.params)
 

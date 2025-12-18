@@ -29,8 +29,8 @@ type createKubernetesResourceParams struct {
 	Resource  any    `json:"resource" jsonschema:"the resource to be created"`
 }
 
-// CreateKubernetesResource creates a new Kubernetes resource.
-func (t *Tools) CreateKubernetesResource(ctx context.Context, toolReq *mcp.CallToolRequest, params createKubernetesResourceParams) (*mcp.CallToolResult, any, error) {
+// createKubernetesResource creates a new Kubernetes resource.
+func (t *Tools) createKubernetesResource(ctx context.Context, toolReq *mcp.CallToolRequest, params createKubernetesResourceParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("createKubernetesResource called")
 
 	resourceInterface, err := t.client.GetResourceInterface(ctx, toolReq.Extra.Header.Get(tokenHeader), toolReq.Extra.Header.Get(urlHeader), params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])

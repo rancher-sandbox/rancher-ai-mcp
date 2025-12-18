@@ -102,7 +102,7 @@ func TestGetNodes(t *testing.T) {
 			}
 			tools := Tools{client: c}
 
-			result, _, err := tools.GetNodes(context.TODO(), &mcp.CallToolRequest{
+			result, _, err := tools.getNodes(context.TODO(), &mcp.CallToolRequest{
 				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}, tokenHeader: {fakeToken}}},
 			}, test.params)
 

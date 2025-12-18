@@ -69,7 +69,7 @@ func TestGetResource(t *testing.T) {
 			}
 			tools := Tools{client: c}
 
-			result, _, err := tools.GetResource(context.TODO(), &mcp.CallToolRequest{
+			result, _, err := tools.getResource(context.TODO(), &mcp.CallToolRequest{
 				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}, tokenHeader: {fakeToken}}},
 			}, test.params)
 

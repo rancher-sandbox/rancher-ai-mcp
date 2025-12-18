@@ -10,15 +10,15 @@ import (
 	"go.uber.org/zap"
 )
 
-// ListKubernetesResourcesParams specifies the parameters needed to list kubernetes resources.
-type ListKubernetesResourcesParams struct {
+// listKubernetesResourcesParams specifies the parameters needed to list kubernetes resources.
+type listKubernetesResourcesParams struct {
 	Namespace string `json:"namespace" jsonschema:"the namespace of the resource"`
 	Kind      string `json:"kind" jsonschema:"the kind of the resource"`
 	Cluster   string `json:"cluster" jsonschema:"the cluster of the resource"`
 }
 
-// ListKubernetesResources lists Kubernetes resources of a specific kind and namespace.
-func (t *Tools) ListKubernetesResources(ctx context.Context, toolReq *mcp.CallToolRequest, params ListKubernetesResourcesParams) (*mcp.CallToolResult, any, error) {
+// listKubernetesResources lists Kubernetes resources of a specific kind and namespace.
+func (t *Tools) listKubernetesResources(ctx context.Context, toolReq *mcp.CallToolRequest, params listKubernetesResourcesParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("listKubernetesResource called")
 
 	resources, err := t.client.GetResources(ctx, client.ListParams{

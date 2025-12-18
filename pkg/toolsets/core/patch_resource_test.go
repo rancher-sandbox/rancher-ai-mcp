@@ -39,18 +39,18 @@ func TestUpdateKubernetesResource(t *testing.T) {
 	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
-		params         UpdateKubernetesResourceParams
+		params         updateKubernetesResourceParams
 		fakeDynClient  *dynamicfake.FakeDynamicClient
 		expectedResult string
 		expectedError  string
 	}{
 		"update configmap - add new key": {
-			params: UpdateKubernetesResourceParams{
+			params: updateKubernetesResourceParams{
 				Name:      "test-config",
 				Namespace: "default",
 				Kind:      "configmap",
 				Cluster:   "local",
-				Patch: []JSONPatch{
+				Patch: []jsonPatch{
 					{
 						Op:    "add",
 						Path:  "/data/key3",
@@ -76,12 +76,12 @@ func TestUpdateKubernetesResource(t *testing.T) {
 			}`,
 		},
 		"update configmap - replace existing key": {
-			params: UpdateKubernetesResourceParams{
+			params: updateKubernetesResourceParams{
 				Name:      "test-config",
 				Namespace: "default",
 				Kind:      "configmap",
 				Cluster:   "local",
-				Patch: []JSONPatch{
+				Patch: []jsonPatch{
 					{
 						Op:    "replace",
 						Path:  "/data/key1",
@@ -107,12 +107,12 @@ func TestUpdateKubernetesResource(t *testing.T) {
 			}`,
 		},
 		"update configmap - remove key": {
-			params: UpdateKubernetesResourceParams{
+			params: updateKubernetesResourceParams{
 				Name:      "test-config",
 				Namespace: "default",
 				Kind:      "configmap",
 				Cluster:   "local",
-				Patch: []JSONPatch{
+				Patch: []jsonPatch{
 					{
 						Op:   "remove",
 						Path: "/data/key2",
@@ -137,12 +137,12 @@ func TestUpdateKubernetesResource(t *testing.T) {
 			}`,
 		},
 		"update configmap - not found": {
-			params: UpdateKubernetesResourceParams{
+			params: updateKubernetesResourceParams{
 				Name:      "nonexistent-config",
 				Namespace: "default",
 				Kind:      "configmap",
 				Cluster:   "local",
-				Patch: []JSONPatch{
+				Patch: []jsonPatch{
 					{
 						Op:    "replace",
 						Path:  "/data/key1",
@@ -166,7 +166,7 @@ func TestUpdateKubernetesResource(t *testing.T) {
 			}
 			tools := Tools{client: c}
 
-			result, _, err := tools.UpdateKubernetesResource(context.TODO(), &mcp.CallToolRequest{
+			result, _, err := tools.updateKubernetesResource(context.TODO(), &mcp.CallToolRequest{
 				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}, tokenHeader: {fakeToken}}},
 			}, test.params)
 

@@ -165,7 +165,7 @@ func TestGetDeploymentDetails(t *testing.T) {
 			}
 			tools := Tools{client: c}
 
-			result, _, err := tools.GetDeploymentDetails(context.TODO(), &mcp.CallToolRequest{
+			result, _, err := tools.getDeploymentDetails(context.TODO(), &mcp.CallToolRequest{
 				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}, tokenHeader: {fakeToken}}},
 			}, test.params)
 
