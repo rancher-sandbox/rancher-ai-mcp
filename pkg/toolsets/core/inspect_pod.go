@@ -79,17 +79,7 @@ func (t *Tools) inspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 
 	var parentName, parentKind string
 	for _, or := range replicaSet.OwnerReferences {
-		if or.Kind == "Deployment" {
-			parentName = or.Name
-			parentKind = or.Kind
-			break
-		}
-		if or.Kind == "StatefulSet" {
-			parentName = or.Name
-			parentKind = or.Kind
-			break
-		}
-		if or.Kind == "DaemonSet" {
+		if or.Kind == "Deployment" || or.Kind == "StatefulSet" || or.Kind == "DaemonSet" {
 			parentName = or.Name
 			parentKind = or.Kind
 			break
