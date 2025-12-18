@@ -17,6 +17,9 @@ type getClusterImagesParams struct {
 	Clusters []string `json:"clusters" jsonschema:"the clusters where images are returned"`
 }
 
+// getClusterImages retrieves all container images used across specified clusters.
+// If no clusters are provided, it fetches images from all available clusters.
+// Returns a JSON map of cluster names to lists of container images.
 func (t *Tools) getClusterImages(ctx context.Context, toolReq *mcp.CallToolRequest, params getClusterImagesParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("getClusterImages called")
 
