@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"reflect"
 	"sync"
 	"testing"
 
@@ -135,32 +134,19 @@ func TestGetClusterId(t *testing.T) {
 				require.NoError(t, err)
 			}
 			assert.Equal(t, test.expectedID, clusterID)
-			assert.True(t, compareMapWithSyncMap(test.expectedClusterIdsCache, &clusterIdsCache))
-			assert.True(t, compareMapWithSyncMap(test.expectedClustersDisplayNameToIDCache, &clustersDisplayNameToIDCache))
+			assert.Equal(t, test.expectedClusterIdsCache, syncMapToMap(&clusterIdsCache))
+			assert.Equal(t, test.expectedClustersDisplayNameToIDCache, syncMapToMap(&clustersDisplayNameToIDCache))
 		})
 	}
 }
 
-func compareMapWithSyncMap(standardMap map[string]any, syncMap *sync.Map) bool {
-	// extract contents of the sync.Map into a temporary map and count elements
-	syncMapContents := make(map[string]any)
-	syncMapCount := 0
-
-	// Use Range for thread-safe iteration
+func syncMapToMap(syncMap *sync.Map) map[string]any {
+	result := make(map[string]any)
 	syncMap.Range(func(key, value any) bool {
-		keyStr := key.(string)
-		syncMapContents[keyStr] = value
-		syncMapCount++
-		return true // continue iteration
+		result[key.(string)] = value
+		return true
 	})
-
-	standardMapCount := len(standardMap)
-
-	if standardMapCount != syncMapCount {
-		return false
-	}
-
-	return reflect.DeepEqual(standardMap, syncMapContents)
+	return result
 }
 
 func scheme() *runtime.Scheme {
