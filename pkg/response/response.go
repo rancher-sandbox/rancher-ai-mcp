@@ -37,8 +37,9 @@ type MCPResponse struct {
 func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string) (string, error) {
 	var uiContext []UIContext
 	for _, obj := range objs {
-		// Remove managedFields from each object to reduce payload size and remove irrelevant data for the LLM.
-		removeManagedFieldsIfPresent(obj)
+		unstructured.RemoveNestedField(obj.Object, "metadata", "managedFields")
+		unstructured.RemoveNestedField(obj.Object, "metadata", "annotations", "kubectl.kubernetes.io/last-applied-configuration")
+
 		lowerKind := strings.ToLower(obj.GetKind())
 		if lowerKind == "" {
 			continue
@@ -71,18 +72,4 @@ func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string) (strin
 	}
 
 	return string(bytes), nil
-}
-
-// removeManagedFieldsIfPresent removes the managedFields from the metadata of an unstructured object.
-// This helps reduce payload size and removes data that is not relevant for LLM processing.
-func removeManagedFieldsIfPresent(obj *unstructured.Unstructured) {
-	if obj == nil || obj.Object == nil {
-		return
-	}
-	metadata, ok := obj.Object["metadata"].(map[string]interface{})
-	if !ok {
-		// nothing to do
-		return
-	}
-	delete(metadata, "managedFields")
 }
