@@ -67,6 +67,9 @@ func TestCreateMCPResponse(t *testing.T) {
 								"apiVersion": "v1",
 								"fieldsType": "FieldsV1",
 							},
+							"annotations": map[string]any{
+								"kubectl.kubernetes.io/last-applied-configuration": "{}",
+							},
 						},
 					},
 				},
@@ -74,7 +77,7 @@ func TestCreateMCPResponse(t *testing.T) {
 			namespace:      "default",
 			cluster:        "local",
 			additionalInfo: []string{},
-			expected:       `{"llm":[{"apiVersion":"v1","kind":"Pod","metadata":{"name":"test-pod","namespace":"default"}}],"uiContext":[{"namespace":"default","kind":"Pod","cluster":"local","name":"test-pod","type":"pod"}]}`,
+			expected:       `{"llm":[{"apiVersion":"v1","kind":"Pod","metadata":{"annotations":{},"name":"test-pod","namespace":"default"}}],"uiContext":[{"namespace":"default","kind":"Pod","cluster":"local","name":"test-pod","type":"pod"}]}`,
 			expectError:    false,
 		},
 		"multiple pods": {

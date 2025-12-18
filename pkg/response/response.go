@@ -1,11 +1,12 @@
 package response
 
 import (
+	"encoding/json"
 	"fmt"
-	"mcp/internal/tools/converter"
 	"strings"
 
-	"encoding/json"
+	"mcp/pkg/converter"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -36,9 +37,13 @@ type MCPResponse struct {
 func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string) (string, error) {
 	var uiContext []UIContext
 	for _, obj := range objs {
-		// Remove managedFields from each object to reduce payload size and remove irrelevant data for the LLM.
-		removeManagedFieldsIfPresent(obj)
+		unstructured.RemoveNestedField(obj.Object, "metadata", "managedFields")
+		unstructured.RemoveNestedField(obj.Object, "metadata", "annotations", "kubectl.kubernetes.io/last-applied-configuration")
+
 		lowerKind := strings.ToLower(obj.GetKind())
+		if lowerKind == "" {
+			continue
+		}
 		steveType := lowerKind
 		if gvr, ok := converter.K8sKindsToGVRs[lowerKind]; ok && gvr.Group != "" {
 			steveType = gvr.Group + "." + lowerKind
@@ -67,16 +72,4 @@ func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string) (strin
 	}
 
 	return string(bytes), nil
-}
-
-func removeManagedFieldsIfPresent(obj *unstructured.Unstructured) {
-	if obj == nil || obj.Object == nil {
-		return
-	}
-	metadata, ok := obj.Object["metadata"].(map[string]interface{})
-	if !ok {
-		// nothing to do
-		return
-	}
-	delete(metadata, "managedFields")
 }
