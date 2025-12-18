@@ -35,9 +35,11 @@ func TestAddTools(t *testing.T) {
 
 	serverAddr := "http://" + listener.Addr().String()
 
+	server := &http.Server{Handler: handler}
 	go func() {
-		http.Serve(listener, handler)
+		server.Serve(listener)
 	}()
+	defer server.Shutdown(context.Background())
 
 	// Wait for server to be ready by attempting to connect with retries
 	ctx := context.Background()
