@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	podLogsTailLines = 50
+	podLogsTailLines int64 = 50
 )
 
 // containerLogs holds logs for multiple containers.
@@ -143,7 +143,7 @@ func (t *Tools) getPodLogs(ctx context.Context, url string, cluster string, toke
 	}
 	for _, container := range pod.Spec.Containers {
 		podLogOptions := corev1.PodLogOptions{
-			TailLines: ptr.To[int64](podLogsTailLines),
+			TailLines: ptr.To(podLogsTailLines),
 			Container: container.Name,
 		}
 		req := clientset.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &podLogOptions)
