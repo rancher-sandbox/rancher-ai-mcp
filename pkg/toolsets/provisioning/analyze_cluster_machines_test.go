@@ -140,7 +140,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 		params         InspectClusterMachinesParams
 		fakeClientset  kubernetes.Interface
 		fakeDynClient  *dynamicfake.FakeDynamicClient
-		expectedResult interface{} // can be string (JSON)
+		expectedResult string
 		expectedError  string
 	}{
 		"analyze cluster with machines, machine sets, and deployments": {
@@ -496,9 +496,8 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				assert.NoError(t, err)
 				text, ok := result.Content[0].(*mcp.TextContent)
 				assert.Truef(t, ok, "expected type *mcp.TextContent")
-				expectedJSON, ok := test.expectedResult.(string)
 				assert.Truef(t, ok, "expected expectedResult to be a JSON string")
-				assert.JSONEq(t, expectedJSON, text.Text)
+				assert.JSONEq(t, test.expectedResult, text.Text)
 			}
 		})
 	}

@@ -102,8 +102,7 @@ func (c *Client) GetResourceInterface(ctx context.Context, token string, url str
 // GetResource retrieves a single Kubernetes resource by name.
 // It returns the resource as an unstructured object or an error if the resource is not found.
 func (c *Client) GetResource(ctx context.Context, params GetParams) (*unstructured.Unstructured, error) {
-	gvk := converter.K8sKindsToGVRs[strings.ToLower(params.Kind)]
-	resourceInterface, err := c.GetResourceInterface(ctx, params.Token, params.URL, params.Namespace, params.Cluster, gvk)
+	resourceInterface, err := c.GetResourceInterface(ctx, params.Token, params.URL, params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
 	if err != nil {
 		return nil, err
 	}

@@ -54,7 +54,6 @@ func (t *Tools) AnalyzeClusterMachines(ctx context.Context, toolReq *mcp.CallToo
 	// all CAPI resources exist in the local cluster only.
 	mcpResponse, err := response.CreateMcpResponse(resources, LocalCluster)
 	if err != nil {
-		log.Error("failed to create mcp response", zap.Error(err))
 		return nil, nil, err
 	}
 

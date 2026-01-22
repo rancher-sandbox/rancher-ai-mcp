@@ -16,7 +16,7 @@ import (
 
 type InspectClusterParams struct {
 	Cluster   string `json:"cluster" jsonschema:"the name of the provisioning cluster"`
-	Namespace string `json:"namespace" jsonschema:"the namespace of the resource, defaults to fleet-local if not set"`
+	Namespace string `json:"namespace" jsonschema:"the namespace of the resource"`
 }
 
 // AnalyzeCluster returns a set of kubernetes resources that can be used to inspect the cluster for debugging and summary purposes.
@@ -129,7 +129,6 @@ func (t *Tools) AnalyzeCluster(ctx context.Context, toolReq *mcp.CallToolRequest
 
 	mcpResponse, err := response.CreateMcpResponse(resources, LocalCluster)
 	if err != nil {
-		log.Error("failed to create mcp response", zap.Error(err))
 		return nil, nil, err
 	}
 

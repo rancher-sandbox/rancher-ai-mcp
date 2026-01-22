@@ -13,7 +13,7 @@ import (
 
 type GetClusterMachineParams struct {
 	Cluster     string `json:"cluster" jsonschema:"the name of the cluster the machines belong to"`
-	MachineName string `json:"machineName" jsonschema:"the name of the machine to retrieve, if not set all machines for the cluster are returned"`
+	MachineName string `json:"machineName" jsonschema:"the name of the machine to retrieve"`
 }
 
 // GetClusterMachine returns the cluster API machine for a given provisioning cluster and machine name.
@@ -49,7 +49,6 @@ func (t *Tools) GetClusterMachine(ctx context.Context, toolReq *mcp.CallToolRequ
 	// all CAPI resources exist in the local cluster only.
 	mcpResponse, err := response.CreateMcpResponse(resources, "local")
 	if err != nil {
-		zap.L().Error("failed to create mcp response", zap.String("tool", "inspectProvisioningCluster"), zap.Error(err))
 		return nil, nil, err
 	}
 	return &mcp.CallToolResult{

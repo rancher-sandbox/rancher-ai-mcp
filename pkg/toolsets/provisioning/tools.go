@@ -33,8 +33,6 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Parameters:
 		cluster (string): The name of the Kubernetes cluster
 		namespace (string): The namespace where the resource is located. This is an optional field that can be omitted if needed.
-
-		Returns:
 		`},
 		t.AnalyzeCluster)
 
@@ -47,8 +45,6 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Parameters:
 		cluster (string): The name of the Kubernetes cluster
 		namespace (string): The namespace where the resource is located. This is an optional field that can be omitted if needed.
-
-		Returns:
 		`},
 		t.AnalyzeClusterMachines)
 
@@ -61,8 +57,6 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Parameters:
 		cluster (string): The name of the Kubernetes cluster
 		machineName (string): The name of the machine to get
-
-		Returns: 
 		`},
 		t.GetClusterMachine)
 }

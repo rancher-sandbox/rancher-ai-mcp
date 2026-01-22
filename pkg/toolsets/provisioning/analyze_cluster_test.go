@@ -20,7 +20,7 @@ func TestAnalyzeCluster(t *testing.T) {
 		params         InspectClusterParams
 		fakeClientset  kubernetes.Interface
 		fakeDynClient  *dynamicfake.FakeDynamicClient
-		expectedResult interface{} // can be string (JSON) or response.MCPResponse
+		expectedResult string
 		expectedError  string
 	}{
 		"analyze cluster with all resources": {
@@ -1464,9 +1464,8 @@ func TestAnalyzeCluster(t *testing.T) {
 				text, ok := result.Content[0].(*mcp.TextContent)
 				assert.Truef(t, ok, "expected type *mcp.TextContent")
 
-				expectedJSON, ok := test.expectedResult.(string)
 				assert.Truef(t, ok, "expected expectedResult to be a JSON string")
-				assert.JSONEq(t, expectedJSON, text.Text)
+				assert.JSONEq(t, test.expectedResult, text.Text)
 			}
 		})
 	}
