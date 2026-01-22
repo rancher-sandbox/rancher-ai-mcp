@@ -1,6 +1,36 @@
 package converter
 
-import "k8s.io/apimachinery/pkg/runtime/schema"
+import (
+	"k8s.io/apimachinery/pkg/runtime/schema"
+)
+
+const (
+	MachineConfigGroup = "rke-machine-config.cattle.io"
+
+	// CAPIKindPrefix is used to differentiate between resources which
+	// share the same kind but are a part of different groups
+	//(i.e. capicluster vs provisioningcluster)
+	CAPIKindPrefix                    = "capi"
+	CAPIGroup                         = "cluster.x-k8s.io"
+	CAPIMachineResourceKind           = CAPIKindPrefix + "machine"
+	CAPIClusterResourceKind           = CAPIKindPrefix + "cluster"
+	CAPIMachineSetResourceKind        = CAPIKindPrefix + "machineset"
+	CAPIMachineDeploymentResourceKind = CAPIKindPrefix + "machinedeployment"
+
+	// ProvisioningKindPrefix is used to differentiate between resources which
+	// share the same kind but are a part of different groups
+	// (i.e. provisioningcluster vs managementcluster)
+	ProvisioningKindPrefix          = "provisioning"
+	ProvisioningGroup               = "provisioning.cattle.io"
+	ProvisioningClusterResourceKind = ProvisioningKindPrefix + "cluster"
+
+	// ManagementKindPrefix is used to differentiate between resources which
+	// share the same kind but are a part of different groups
+	// (i.e. managementcluster vs provisioningcluster)
+	ManagementKindPrefix          = "management"
+	ManagementGroup               = "management.cattle.io"
+	ManagementClusterResourceKind = ManagementKindPrefix + "cluster"
+)
 
 // K8sKindsToGVRs maps lowercase Kubernetes resource kind names to their corresponding
 // GroupVersionResource (GVR) identifiers. This mapping is used for dynamic client operations
@@ -63,16 +93,19 @@ var K8sKindsToGVRs = map[string]schema.GroupVersionResource{
 	"pod.metrics.k8s.io":  {Group: "metrics.k8s.io", Version: "v1beta1", Resource: "pods"},
 
 	// --- RANCHER CORE Resources (Group: "management.cattle.io") ---
-	"cluster":                    {Group: "management.cattle.io", Version: "v3", Resource: "clusters"},
-	"project":                    {Group: "management.cattle.io", Version: "v3", Resource: "projects"},
-	"user":                       {Group: "management.cattle.io", Version: "v3", Resource: "users"},
-	"roletemplate":               {Group: "management.cattle.io", Version: "v3", Resource: "roletemplates"},
-	"globalrole":                 {Group: "management.cattle.io", Version: "v3", Resource: "globalroles"},
-	"globalrolebinding":          {Group: "management.cattle.io", Version: "v3", Resource: "globalrolebindings"},
-	"clusterroletemplatebinding": {Group: "management.cattle.io", Version: "v3", Resource: "clusterroletemplatebindings"},
-	"projectroletemplatebinding": {Group: "management.cattle.io", Version: "v3", Resource: "projectroletemplatebindings"},
-	"nodetemplate":               {Group: "management.cattle.io", Version: "v3", Resource: "nodetemplates"},
-	"nodedriver":                 {Group: "management.cattle.io", Version: "v3", Resource: "nodedrivers"},
+	ManagementClusterResourceKind: {Group: ManagementGroup, Version: "v3", Resource: "clusters"},
+	"project":                     {Group: ManagementGroup, Version: "v3", Resource: "projects"},
+	"user":                        {Group: ManagementGroup, Version: "v3", Resource: "users"},
+	"roletemplate":                {Group: ManagementGroup, Version: "v3", Resource: "roletemplates"},
+	"globalrole":                  {Group: ManagementGroup, Version: "v3", Resource: "globalroles"},
+	"globalrolebinding":           {Group: ManagementGroup, Version: "v3", Resource: "globalrolebindings"},
+	"clusterroletemplatebinding":  {Group: ManagementGroup, Version: "v3", Resource: "clusterroletemplatebindings"},
+	"projectroletemplatebinding":  {Group: ManagementGroup, Version: "v3", Resource: "projectroletemplatebindings"},
+	"nodetemplate":                {Group: ManagementGroup, Version: "v3", Resource: "nodetemplates"},
+	"nodedriver":                  {Group: ManagementGroup, Version: "v3", Resource: "nodedrivers"},
+
+	// --- RANCHER PROVISIONING Resources (Group: "provisioning.cattle.io") ---
+	ProvisioningClusterResourceKind: {Group: ProvisioningGroup, Version: "v1", Resource: "clusters"},
 
 	// --- RANCHER FLEET Resources (Group: "fleet.cattle.io") ---
 	"bundle":           {Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "bundles"},
@@ -82,5 +115,14 @@ var K8sKindsToGVRs = map[string]schema.GroupVersionResource{
 	"fleetcluster":     {Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "clusters"}, // Renamed to avoid collision with management.cattle.io/v3/clusters
 
 	// --- RANCHER CATTLE Resources (Group: "cattle.io") ---
-	"setting": {Group: "management.cattle.io", Version: "v3", Resource: "settings"},
+	"setting": {Group: ManagementGroup, Version: "v3", Resource: "settings"},
+
+	// --- CLUSTER API Resources (Group: "cluster.x-k8s.io") ---
+	// NB: version is intentionally left empty as it can vary (v1beta1, v1beta2, etc.) depending on the version
+	// of Rancher being used. Instead of hardcoding the version, we instead query all available versions when looking
+	// up one of these resources.
+	CAPIClusterResourceKind:           {Group: CAPIGroup, Version: "", Resource: "clusters"},
+	CAPIMachineResourceKind:           {Group: CAPIGroup, Version: "", Resource: "machines"},
+	CAPIMachineSetResourceKind:        {Group: CAPIGroup, Version: "", Resource: "machinesets"},
+	CAPIMachineDeploymentResourceKind: {Group: CAPIGroup, Version: "", Resource: "machinedeployments"},
 }
