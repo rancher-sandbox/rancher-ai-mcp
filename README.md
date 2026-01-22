@@ -57,16 +57,19 @@ The server supports two modes:
 
 Each tool is exposed through the MCP protocol and can be invoked by the Rancher AI agent:
 
-| Tool | Description |
-|------|-------------|
-| `getKubernetesResource` | Retrieve a specific Kubernetes resource by name and type |
-| `patchKubernetesResource` | Apply JSON patch operations to existing resources |
-| `listKubernetesResources` | List all resources of a specific type in a namespace |
-| `inspectPod` | Get detailed information about a pod including logs and events |
-| `getDeployment` | Retrieve deployment details with replica status |
-| `getNodeMetrics` | Fetch resource usage metrics for cluster nodes |
-| `createKubernetesResource` | Create new Kubernetes resources from manifests |
-| `getClusterImages` | List all container images used across the cluster |
+| Tool                       | Description                                                                                  |
+|----------------------------|----------------------------------------------------------------------------------------------|
+| `getKubernetesResource`    | Retrieve a specific Kubernetes resource by name and type                                     |
+| `patchKubernetesResource`  | Apply JSON patch operations to existing resources                                            |
+| `listKubernetesResources`  | List all resources of a specific type in a namespace                                         |
+| `inspectPod`               | Get detailed information about a pod including logs and events                               |
+| `getDeployment`            | Retrieve deployment details with replica status                                              |
+| `getNodeMetrics`           | Fetch resource usage metrics for cluster nodes                                               |
+| `createKubernetesResource` | Create new Kubernetes resources from manifests                                               |
+| `getClusterImages`         | List all container images used across the cluster                                            |
+| `analyzeCluster`           | Retrieve multiple kubernetes resources related to a downstream cluster and its current state |
+| `analyzeClusterMachines`   | Retrieve all Cluster API objects related to all machines within a downstream cluster         |
+| `getClusterMachine`        | Retrieve all cluster API objects related to a specific machine within a downstream cluster   |
 
 ## Configuration
 
