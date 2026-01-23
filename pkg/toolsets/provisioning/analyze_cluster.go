@@ -23,7 +23,7 @@ type InspectClusterParams struct {
 func (t *Tools) AnalyzeCluster(ctx context.Context, toolReq *mcp.CallToolRequest, params InspectClusterParams) (*mcp.CallToolResult, any, error) {
 	ns := params.Namespace
 	if ns == "" {
-		ns = "fleet-default"
+		ns = DefaultClusterResourcesNamespace
 		if params.Cluster == LocalCluster {
 			ns = "fleet-local"
 		}
@@ -34,7 +34,7 @@ func (t *Tools) AnalyzeCluster(ctx context.Context, toolReq *mcp.CallToolRequest
 		"namespace": ns,
 	})
 
-	log.Info("Analyzing cluster")
+	log.Debug("Analyzing cluster")
 
 	provClusterResource, provCluster, err := t.getProvisioningCluster(ctx, toolReq, log, ns, params.Cluster)
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -44,9 +44,13 @@ func (t *Tools) AnalyzeCluster(ctx context.Context, toolReq *mcp.CallToolRequest
 
 	if apierrors.IsNotFound(err) {
 		// the only cluster type without a provisioning cluster object is rke1, which is no longer supported.
-		log.Warn("could not find provisioning cluster, likely an unsupported cluster type for tool")
+		log.Warn("provisioning cluster not found, unsupported cluster type")
 		return nil, nil, fmt.Errorf("provisioning cluster %s not found in namespace %s", params.Cluster, ns)
 	}
+
+	log.Debug("found provisioning cluster",
+		zap.String("provisioningCluster", provCluster.Name),
+		zap.String("clusterName", provCluster.Status.ClusterName))
 
 	var resources []*unstructured.Unstructured
 	resources = append(resources, provClusterResource)
@@ -54,6 +58,7 @@ func (t *Tools) AnalyzeCluster(ctx context.Context, toolReq *mcp.CallToolRequest
 	// get the management cluster, its status may be relevant.
 	// NB: Unlike the v1.Cluster object we can't directly import the v3.Cluster
 	// since it pulls in a lot of indirect dependencies (operators for aks, eks, gke, etc.)
+	log.Debug("fetching management cluster", zap.String("managementCluster", provCluster.Status.ClusterName))
 	managementClusterResource, err := t.client.GetResource(ctx, client.GetParams{
 		Cluster: LocalCluster,
 		Kind:    converter.ManagementClusterResourceKind,
@@ -64,54 +69,73 @@ func (t *Tools) AnalyzeCluster(ctx context.Context, toolReq *mcp.CallToolRequest
 		Token:     toolReq.Extra.Header.Get(tokenHeader),
 	})
 	if err != nil && !apierrors.IsNotFound(err) {
-		log.Error("failed to get management cluster", zap.Error(err))
+		log.Error("failed to get management cluster",
+			zap.String("managementCluster", provCluster.Status.ClusterName),
+			zap.Error(err))
 		return nil, nil, err
+	}
+	if apierrors.IsNotFound(err) {
+		log.Debug("management cluster not found", zap.String("managementCluster", provCluster.Status.ClusterName))
 	}
 	if err == nil {
 		resources = append(resources, managementClusterResource)
-		log.Info("found management cluster", zap.String("managementCluster", provCluster.Status.ClusterName))
+		log.Debug("found management cluster", zap.String("managementCluster", provCluster.Status.ClusterName))
 	}
 
 	// get the CAPI cluster
+	log.Debug("fetching CAPI cluster", zap.String("capiCluster", provCluster.Name))
 	capiClusterResource, err := t.client.GetResourceAtAnyAPIVersion(ctx, client.GetParams{
 		Cluster:   LocalCluster,
 		Kind:      converter.CAPIClusterResourceKind,
-		Namespace: "fleet-default",
+		Namespace: DefaultClusterResourcesNamespace,
 		Name:      provCluster.Name,
 		URL:       toolReq.Extra.Header.Get(urlHeader),
 		Token:     toolReq.Extra.Header.Get(tokenHeader),
 	})
 	if err != nil && !apierrors.IsNotFound(err) {
-		log.Error("failed to get CAPI cluster", zap.Error(err))
+		log.Error("failed to get CAPI cluster",
+			zap.String("capiCluster", provCluster.Name),
+			zap.Error(err))
 		return nil, nil, err
 	}
+	if apierrors.IsNotFound(err) {
+		log.Debug("CAPI cluster not found", zap.String("capiCluster", provCluster.Name))
+	}
 	if err == nil {
-		log.Info("found CAPI cluster")
+		log.Debug("found CAPI cluster", zap.String("capiCluster", provCluster.Name))
 		resources = append(resources, capiClusterResource)
 	}
 
 	// get all machine configs for node driver clusters.
+	log.Debug("fetching machine pool configs")
 	machineConfigs, err := t.getMachinePoolConfigs(ctx, toolReq, log, provCluster)
 	if err != nil && !apierrors.IsNotFound(err) {
 		log.Error("failed to get machine pool configs", zap.Error(err))
 		return nil, nil, err
 	}
+	if apierrors.IsNotFound(err) {
+		log.Debug("no machine pool configs found")
+	}
 	if err == nil && len(machineConfigs) > 0 {
-		log.Info("found machine pool configs", zap.Int("count", len(machineConfigs)))
+		log.Debug("found machine pool configs", zap.Int("count", len(machineConfigs)))
 		resources = append(resources, machineConfigs...)
 	}
 
 	// get all the CAPI machine resources
+	log.Debug("fetching CAPI machine resources")
 	machines, machineSets, machineDeployments, err := t.getAllCAPIMachineResources(ctx, toolReq, log, getCAPIMachineResourcesParams{
-		namespace:     "fleet-default",
+		namespace:     DefaultClusterResourcesNamespace,
 		targetCluster: params.Cluster,
 	})
 	if err != nil && !apierrors.IsNotFound(err) {
 		log.Error("failed to lookup CAPI machines", zap.Error(err))
 		return nil, nil, err
 	}
+	if apierrors.IsNotFound(err) {
+		log.Debug("CAPI machine resources not found")
+	}
 	if err == nil {
-		log.Info("found CAPI machines",
+		log.Debug("found CAPI machine resources",
 			zap.Int("machines", len(machines)),
 			zap.Int("machineSets", len(machineSets)),
 			zap.Int("machineDeployments", len(machineDeployments)))
@@ -127,8 +151,14 @@ func (t *Tools) AnalyzeCluster(ctx context.Context, toolReq *mcp.CallToolRequest
 		resources = append(resources, machineDeployments...)
 	}
 
+	log.Info("cluster analysis complete",
+		zap.Int("totalResources", len(resources)))
+
 	mcpResponse, err := response.CreateMcpResponse(resources, LocalCluster)
 	if err != nil {
+		log.Error("failed to create MCP response",
+			zap.Int("resourceCount", len(resources)),
+			zap.Error(err))
 		return nil, nil, err
 	}
 
