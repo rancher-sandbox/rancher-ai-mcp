@@ -3,6 +3,7 @@ package toolsets
 import (
 	"mcp/pkg/client"
 	"mcp/pkg/toolsets/core"
+	"mcp/pkg/toolsets/fleet"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -20,5 +21,8 @@ func AddAllTools(client *client.Client, mcpServer *mcp.Server) {
 }
 
 func allToolSets(client *client.Client) []toolsAdder {
-	return []toolsAdder{core.NewTools(client)}
+	return []toolsAdder{
+		core.NewTools(client),
+		fleet.NewTools(client),
+	}
 }
