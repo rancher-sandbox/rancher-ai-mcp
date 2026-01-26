@@ -115,6 +115,65 @@ func (c *Client) GetResource(ctx context.Context, params GetParams) (*unstructur
 	return obj, err
 }
 
+func (c *Client) GetResourceByGVR(ctx context.Context, params GetParams, gvr schema.GroupVersionResource) (*unstructured.Unstructured, error) {
+	resourceInterface, err := c.GetResourceInterface(ctx, params.Token, params.URL, params.Namespace, params.Cluster, gvr)
+	if err != nil {
+		return nil, err
+	}
+
+	obj, err := resourceInterface.Get(ctx, params.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	return obj, err
+}
+
+// GetResourceAtAnyAPIVersion queries the API server for all supported versions of the group and resource related to the passed kind. It then attempts to get the
+// specified resource at each API version, stopping when one is found. This is needed when working with resources that may be periodically updated within
+// Rancher, such as Cluster API resources.
+func (c *Client) GetResourceAtAnyAPIVersion(ctx context.Context, params GetParams) (*unstructured.Unstructured, error) {
+	currentGVK, ok := converter.K8sKindsToGVRs[strings.ToLower(params.Kind)]
+	if !ok {
+		return nil, fmt.Errorf("unknown kind: %s", params.Kind)
+	}
+
+	versions, err := c.getAPIVersionsForGR(ctx, params.Token, params.URL, params.Cluster, schema.GroupResource{
+		Group:    currentGVK.Group,
+		Resource: currentGVK.Resource,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var item *unstructured.Unstructured
+	for _, version := range versions {
+		currentGVK.Version = version
+		resourceInterface, err := c.GetResourceInterface(ctx, params.Token, params.URL, params.Namespace, params.Cluster, currentGVK)
+		if err != nil {
+			return nil, err
+		}
+
+		item, err = resourceInterface.Get(ctx, params.Name, metav1.GetOptions{})
+		if err != nil {
+			if errors.IsNotFound(err) {
+				continue
+			}
+			return nil, err
+		}
+		break
+	}
+
+	if item == nil {
+		return nil, errors.NewNotFound(schema.GroupResource{
+			Group:    currentGVK.Group,
+			Resource: currentGVK.Resource,
+		}, params.Name)
+	}
+
+	return item, err
+}
+
 // GetResources lists Kubernetes resources matching the provided parameters.
 // It supports optional label selectors for filtering and returns a slice of unstructured objects.
 func (c *Client) GetResources(ctx context.Context, params ListParams) ([]*unstructured.Unstructured, error) {
@@ -130,6 +189,59 @@ func (c *Client) GetResources(ctx context.Context, params ListParams) ([]*unstru
 	list, err := resourceInterface.List(ctx, opts)
 	if err != nil {
 		return nil, err
+	}
+
+	objs := make([]*unstructured.Unstructured, len(list.Items))
+	for i := range list.Items {
+		objs[i] = &list.Items[i]
+	}
+
+	return objs, err
+}
+
+// GetResourcesAtAnyAPIVersion queries the API server for all supported versions of the group and resource related to the passed kind. It then attempts to get the
+// specified resource at each API version, stopping when one is found. This is needed when working with resources that may be periodically updated within
+// Rancher, such as Cluster API resources.
+func (c *Client) GetResourcesAtAnyAPIVersion(ctx context.Context, params ListParams) ([]*unstructured.Unstructured, error) {
+	currentGVK, ok := converter.K8sKindsToGVRs[strings.ToLower(params.Kind)]
+	if !ok {
+		return nil, fmt.Errorf("unknown kind: %s", params.Kind)
+	}
+
+	versions, err := c.getAPIVersionsForGR(ctx, params.Token, params.URL, params.Cluster, schema.GroupResource{
+		Group:    currentGVK.Group,
+		Resource: currentGVK.Resource,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var list *unstructured.UnstructuredList
+	for _, version := range versions {
+		currentGVK.Version = version
+		resourceInterface, err := c.GetResourceInterface(ctx, params.Token, params.URL, params.Namespace, params.Cluster, currentGVK)
+		if err != nil {
+			return nil, err
+		}
+		opts := metav1.ListOptions{}
+		if params.LabelSelector != "" {
+			opts.LabelSelector = params.LabelSelector
+		}
+		list, err = resourceInterface.List(ctx, opts)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				continue
+			}
+			return nil, err
+		}
+		break
+	}
+
+	if list == nil || len(list.Items) == 0 {
+		return nil, errors.NewNotFound(schema.GroupResource{
+			Group:    currentGVK.Group,
+			Resource: currentGVK.Resource,
+		}, params.Name)
 	}
 
 	objs := make([]*unstructured.Unstructured, len(list.Items))
@@ -167,7 +279,7 @@ func (c *Client) getClusterId(ctx context.Context, token string, url string, clu
 	}
 
 	// try to fetch the cluster directly by its ID
-	clusterInterface, err := c.GetResourceInterface(ctx, token, url, "", "local", converter.K8sKindsToGVRs["cluster"])
+	clusterInterface, err := c.GetResourceInterface(ctx, token, url, "", "local", converter.K8sKindsToGVRs["managementcluster"])
 	if err != nil {
 		return "", err
 	}
@@ -256,4 +368,35 @@ func (c *Client) createRestConfig(token string, url string, clusterID string) (*
 	}
 
 	return restConfig, nil
+}
+
+// getAPIVersionsForGR queries the API server for all supported versions of the specified GroupResource.
+// It returns a slice of version strings or an error if the query fails.
+func (c *Client) getAPIVersionsForGR(ctx context.Context, token, url, cluster string, groupResource schema.GroupResource) ([]string, error) {
+	clusterID, err := c.getClusterId(ctx, token, url, cluster)
+	if err != nil {
+		return nil, err
+	}
+	restConfig, err := c.createRestConfig(token, url, clusterID)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := c.ClientSetCreator(restConfig)
+	if err != nil {
+		return nil, err
+	}
+	apiGroupList, err := client.Discovery().ServerGroups()
+	if err != nil {
+		return nil, err
+	}
+	var versions []string
+	for _, apiGroup := range apiGroupList.Groups {
+		if apiGroup.Name == groupResource.Group {
+			for _, version := range apiGroup.Versions {
+				versions = append(versions, version.Version)
+			}
+		}
+	}
+	return versions, nil
 }

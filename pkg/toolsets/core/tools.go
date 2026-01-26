@@ -130,4 +130,5 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Parameters:
 		clusters (array of strings): List of clusters to get images from. Empty for return images for all clusters.`},
 		t.getClusterImages)
+
 }

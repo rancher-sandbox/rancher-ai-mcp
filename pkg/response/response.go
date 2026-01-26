@@ -40,14 +40,35 @@ func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string) (strin
 		unstructured.RemoveNestedField(obj.Object, "metadata", "managedFields")
 		unstructured.RemoveNestedField(obj.Object, "metadata", "annotations", "kubectl.kubernetes.io/last-applied-configuration")
 
-		lowerKind := strings.ToLower(obj.GetKind())
+		gvk := obj.GetObjectKind().GroupVersionKind()
+		lowerKind := strings.ToLower(gvk.Kind)
 		if lowerKind == "" {
 			continue
 		}
+
+		// use prefixes to differentiate duplicate kinds from different API groups
+		// (e.g. cluster.x-k8s.io.cluster vs provisioning.cattle.io.cluster)
+		lookupKind := lowerKind
 		steveType := lowerKind
-		if gvr, ok := converter.K8sKindsToGVRs[lowerKind]; ok && gvr.Group != "" {
+		switch gvk.Group {
+		case converter.CAPIGroup:
+			lookupKind = converter.CAPIKindPrefix + lookupKind
+		case converter.ProvisioningGroup:
+			lookupKind = converter.ProvisioningKindPrefix + lookupKind
+		case converter.ManagementGroup:
+			lookupKind = converter.ManagementKindPrefix + lookupKind
+		case converter.MachineConfigGroup:
+			// machine configs are dynamically generated from node drivers
+			// using their name, so we can't maintain a mapping for all of them.
+			// fortunately, its highly unlikely there will be a conflict across groups
+			// so we just use the group directly.
+			steveType = gvk.Group + "." + lowerKind
+		}
+
+		if gvr, ok := converter.K8sKindsToGVRs[lookupKind]; ok && gvr.Group != "" {
 			steveType = gvr.Group + "." + lowerKind
 		}
+
 		uiContext = append(uiContext, UIContext{
 			Namespace: obj.GetNamespace(),
 			Kind:      obj.GetKind(),
