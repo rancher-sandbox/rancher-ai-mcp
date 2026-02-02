@@ -60,7 +60,7 @@ type OAuthConfig struct {
 	ResourceURL string
 
 	// SupportedScopes is the list of OAuth 2.0 scopes that this resource server supports.
-	// At least one of the scopes in this list must be present in the token for authorization to succeed.
+	// All of the Supported Scopes MUST be in the Auth Token Scope.
 	// https://modelcontextprotocol.io/specification/draft/basic/authorization#scope-selection-strategy
 	SupportedScopes []string
 
@@ -181,9 +181,13 @@ func (c *OAuthConfig) validateTokenScopes(claims jwt.MapClaims) bool {
 		tokenScopes[i] = scope.(string)
 	}
 
-	return slices.ContainsFunc(c.SupportedScopes, func(s string) bool {
-		return slices.Contains(tokenScopes, s)
-	})
+	for _, scope := range c.SupportedScopes {
+		if !slices.Contains(tokenScopes, scope) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // sendUnauthorized sends a 401 response with WWW-Authenticate header.

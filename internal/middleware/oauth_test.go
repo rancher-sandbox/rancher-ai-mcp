@@ -479,47 +479,50 @@ func TestHandleProtectedResourceMetadata_OPTIONS(t *testing.T) {
 }
 
 func TestValidateScope(t *testing.T) {
-	config := &OAuthConfig{
-		SupportedScopes: []string{testScope},
-	}
-
 	tests := []struct {
-		name     string
-		claims   jwt.MapClaims
-		expected bool
+		name            string
+		supportedScopes []string
+		claims          jwt.MapClaims
+		valid           bool
 	}{
 		{
-			name:     "Valid scope",
-			claims:   jwt.MapClaims{"scope": []any{testScope}},
-			expected: true,
+			name:            "Valid scope",
+			supportedScopes: []string{testScope},
+			claims:          jwt.MapClaims{"scope": []any{testScope}},
+			valid:           true,
 		},
 		{
-			name:     "Valid scope with multiple scopes",
-			claims:   jwt.MapClaims{"scope": []any{"openid", "profile", testScope}},
-			expected: true,
+			name:            "Valid scope with multiple scopes",
+			supportedScopes: []string{testScope},
+			claims:          jwt.MapClaims{"scope": []any{"openid", "profile", testScope}},
+			valid:           true,
 		},
 		{
-			name:     "Invalid scope",
-			claims:   jwt.MapClaims{"scope": []any{testInvalidScope}},
-			expected: false,
+			supportedScopes: []string{testScope, testInvalidScope},
+			name:            "Invalid scope",
+			claims:          jwt.MapClaims{"scope": []any{testInvalidScope}},
+			valid:           false,
 		},
 		{
-			name:     "Missing scope",
-			claims:   jwt.MapClaims{},
-			expected: false,
+			name:   "Missing scope",
+			claims: jwt.MapClaims{},
+			valid:  false,
 		},
 		{
-			name:     "Invalid scope type",
-			claims:   jwt.MapClaims{"scope": 123},
-			expected: false,
+			name:   "Invalid scope type",
+			claims: jwt.MapClaims{"scope": 123},
+			valid:  false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			config := &OAuthConfig{
+				SupportedScopes: tt.supportedScopes,
+			}
 			result := config.validateTokenScopes(tt.claims)
-			if result != tt.expected {
-				t.Errorf("Expected %v, got %v", tt.expected, result)
+			if result != tt.valid {
+				t.Errorf("got validTokenScopes %v, want %v", result, tt.valid)
 			}
 		})
 	}
@@ -534,7 +537,7 @@ func TestOAuthMiddleware_CustomScopes(t *testing.T) {
 	claims := jwt.MapClaims{
 		"iss":   config.AuthorizationServerURL,
 		"aud":   config.ResourceURL,
-		"scope": []any{testCustomScope1},
+		"scope": []any{testCustomScope1, testCustomScope2, "offline_offline_Access"},
 		"exp":   time.Now().Add(1 * time.Hour).Unix(),
 		"iat":   time.Now().Unix(),
 	}
@@ -586,48 +589,6 @@ func TestOAuthMiddleware_CustomScopes_Invalid(t *testing.T) {
 	// Verify unauthorized response
 	if rr.Code != http.StatusUnauthorized {
 		t.Errorf("Expected status 401, got %d", rr.Code)
-	}
-}
-
-func TestValidateScope_CustomScopes(t *testing.T) {
-	config := &OAuthConfig{
-		SupportedScopes: []string{testCustomReadOnly, testCustomWrite, testCustomAdmin},
-	}
-
-	tests := []struct {
-		name     string
-		claims   jwt.MapClaims
-		expected bool
-	}{
-		{
-			name:     "Valid custom scope",
-			claims:   jwt.MapClaims{"scope": []any{testCustomReadOnly}},
-			expected: true,
-		},
-		{
-			name:     "Valid custom scope with multiple scopes",
-			claims:   jwt.MapClaims{"scope": []any{"openid", testCustomWrite, "profile"}},
-			expected: true,
-		},
-		{
-			name:     "Invalid custom scope",
-			claims:   jwt.MapClaims{"scope": testScope},
-			expected: false,
-		},
-		{
-			name:     "Multiple valid custom scopes",
-			claims:   jwt.MapClaims{"scope": []any{testCustomReadOnly, testCustomWrite}},
-			expected: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := config.validateTokenScopes(tt.claims)
-			if result != tt.expected {
-				t.Errorf("Expected %v, got %v", tt.expected, result)
-			}
-		})
 	}
 }
 
