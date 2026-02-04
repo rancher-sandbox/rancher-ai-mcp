@@ -66,5 +66,4 @@ func TestAddTools(t *testing.T) {
 	for _, tool := range toolsResult.Tools {
 		assert.Equal(t, toolsSet, tool.Meta[toolsSetAnn])
 	}
-
 }

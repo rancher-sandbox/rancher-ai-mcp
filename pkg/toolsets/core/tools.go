@@ -1,9 +1,14 @@
 package core
 
 import (
+	"context"
 	"mcp/pkg/client"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -11,9 +16,16 @@ const (
 	toolsSetAnn = "toolset"
 )
 
+type toolsClient interface {
+	GetResource(ctx context.Context, params client.GetParams) (*unstructured.Unstructured, error)
+	GetResourceInterface(ctx context.Context, token string, url string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error)
+	GetResources(ctx context.Context, params client.ListParams) ([]*unstructured.Unstructured, error)
+	CreateClientSet(ctx context.Context, token string, url string, cluster string) (kubernetes.Interface, error)
+}
+
 // Tools contains all tools for the MCP server
 type Tools struct {
-	client *client.Client
+	client toolsClient
 }
 
 // NewTools creates and returns a new Tools instance.

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"mcp/internal/middleware"
 	"mcp/pkg/converter"
 	"mcp/pkg/response"
 
@@ -16,8 +17,7 @@ import (
 )
 
 const (
-	tokenHeader = "R_token"
-	urlHeader   = "R_url"
+	urlHeader = "R_url"
 )
 
 // createKubernetesResourceParams defines the structure for creating a general Kubernetes resource.
@@ -33,7 +33,7 @@ type createKubernetesResourceParams struct {
 func (t *Tools) createKubernetesResource(ctx context.Context, toolReq *mcp.CallToolRequest, params createKubernetesResourceParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("createKubernetesResource called")
 
-	resourceInterface, err := t.client.GetResourceInterface(ctx, toolReq.Extra.Header.Get(tokenHeader), toolReq.Extra.Header.Get(urlHeader), params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
+	resourceInterface, err := t.client.GetResourceInterface(ctx, middleware.Token(ctx), toolReq.Extra.Header.Get(urlHeader), params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
 	if err != nil {
 		return nil, nil, err
 	}

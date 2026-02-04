@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 
+	"mcp/internal/middleware"
 	"mcp/pkg/client"
 	"mcp/pkg/toolsets"
 
@@ -27,15 +28,18 @@ const (
 )
 
 var (
-	port     int
-	insecure bool
+	port           int
+	insecure       bool
+	authzServerURL string
+	jwksURL        string
+	resourceURL    string
 )
 
 var serveCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Start the MCP server",
 	Long:  `Start the MCP server to handle requests from the Rancher AI agent`,
-	Run:   runServe,
+	RunE:  runServe,
 }
 
 func init() {
@@ -43,9 +47,13 @@ func init() {
 
 	serveCmd.Flags().IntVar(&port, "port", 9092, "Port to listen on")
 	serveCmd.Flags().BoolVar(&insecure, "insecure", false, "Skip TLS verification")
+
+	serveCmd.Flags().StringVar(&authzServerURL, "authz-server-url", "", "Authorization Server URL - used to generate the OIDC urls")
+	serveCmd.Flags().StringVar(&jwksURL, "jwks-url", "", "JWKS URL - from the OAuth2 server")
+	serveCmd.Flags().StringVar(&resourceURL, "resource-url", "", "Resource URL for this server - this should be the address to access the MCP server")
 }
 
-func runServe(cmd *cobra.Command, args []string) {
+func runServe(cmd *cobra.Command, args []string) error {
 	mcpServer := mcp.NewServer(&mcp.Implementation{Name: "rancher mcp server", Version: "v1.0.0"}, nil)
 	client := client.NewClient(insecure)
 
@@ -55,28 +63,41 @@ func runServe(cmd *cobra.Command, args []string) {
 		return mcpServer
 	}, &mcp.StreamableHTTPOptions{})
 
+	oauthConfig := middleware.NewOAuthConfig(authzServerURL, jwksURL, resourceURL, []string{"offline_access", "rancher:mcp"})
 	if insecure {
-		startInsecureServer(handler)
-	} else {
-		startTLSServer(handler)
+		oauthConfig.InsecureTLS = true
 	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/.well-known/oauth-protected-resource", oauthConfig.HandleProtectedResourceMetadata)
+	mux.Handle("/", oauthConfig.OAuthMiddleware(handler))
+
+	if err := oauthConfig.LoadJWKS(cmd.Context()); err != nil {
+		log.Fatalf("failed to load JWKS: %s", err)
+	}
+
+	if insecure {
+		return startInsecureServer(mux)
+	}
+
+	return startTLSServer(mux)
 }
 
-func startInsecureServer(handler http.Handler) {
+func startInsecureServer(handler http.Handler) error {
 	zap.L().Info("MCP Server started!", zap.Int("port", port), zap.Bool("insecure", true))
 
 	addr := fmt.Sprintf(":%d", port)
-	log.Fatal(http.ListenAndServe(addr, handler))
+	return http.ListenAndServe(addr, handler)
 }
 
-func startTLSServer(handler http.Handler) {
+func startTLSServer(handler http.Handler) error {
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		log.Fatalf("error creating in-cluster config: %v", err)
+		return fmt.Errorf("error creating in-cluster config: %v", err)
 	}
 	factory, err := core.NewFactoryFromConfig(config)
 	if err != nil {
-		log.Fatalf("error creating factory: %v", err)
+		return fmt.Errorf("creating factory: %v", err)
 	}
 
 	ctx := context.Background()
@@ -105,9 +126,11 @@ func startTLSServer(handler http.Handler) {
 		},
 	})
 	if err != nil {
-		log.Fatalf("error creating tls server: %v", err)
+		return fmt.Errorf("creating tls server: %v", err)
 	}
 
 	zap.L().Info("MCP Server with TLS started!", zap.Int("port", port))
 	<-ctx.Done()
+
+	return ctx.Err()
 }
