@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -36,7 +37,11 @@ const (
 var privateKey = mustGenerateRSAKey(2048)
 
 func TestMiddlewareWithLegacyTokenHeader(t *testing.T) {
-	config := setupTestConfig(t, privateKey)
+	config := &OAuthConfig{
+		AuthorizationServerURL: testAuthServerURL,
+		ResourceURL:            testResourceURL,
+		SupportedScopes:        []string{testScope},
+	}
 	claims := jwt.MapClaims{
 		"iss":   config.AuthorizationServerURL,
 		"aud":   config.ResourceURL,
@@ -753,8 +758,8 @@ func TestNewOAuthConfig(t *testing.T) {
 	if config.ResourceURL != resourceURL {
 		t.Errorf("Expected ResourceURL %q, got %q", resourceURL, config.ResourceURL)
 	}
-	if len(config.SupportedScopes) != len(scopes) {
-		t.Errorf("Expected %d scopes, got %d", len(scopes), len(config.SupportedScopes))
+	if !reflect.DeepEqual(config.SupportedScopes, scopes) {
+		t.Errorf("Expected %v scopes, got %v", scopes, config.SupportedScopes)
 	}
 }
 
@@ -765,11 +770,8 @@ func TestLoadJWKSEmptyURL(t *testing.T) {
 
 	err := config.LoadJWKS(t.Context())
 
-	if err == nil {
-		t.Error("Expected error for empty JWKS URL, got nil")
-	}
-	if !strings.Contains(err.Error(), "JWKS URL cannot be empty") {
-		t.Errorf("Expected error message about empty URL, got: %v", err)
+	if err != nil {
+		t.Fatal("LoadJWKS with empty URL got an error")
 	}
 }
 

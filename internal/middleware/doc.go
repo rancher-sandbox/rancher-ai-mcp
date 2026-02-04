@@ -63,4 +63,7 @@
 // The middleware implements an "any-of" scope validation strategy: the token must
 // contain at least one scope from the configured SupportedScopes list. Multiple
 // scopes in the token are space-separated as per OAuth 2.0 specification.
+//
+// If a request is made with R_token then it is passed through without
+// validation to support the previous authentication mechanism.
 package middleware

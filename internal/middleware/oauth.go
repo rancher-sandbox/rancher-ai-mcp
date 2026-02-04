@@ -67,7 +67,7 @@ type OAuthConfig struct {
 	// https://modelcontextprotocol.io/specification/draft/basic/authorization#scope-selection-strategy
 	SupportedScopes []string
 
-	// InsecureTLS cofigures the keyfunc to not validate the TLS connection.
+	// InsecureTLS configures the keyfunc to not validate the TLS connection.
 	// This should ONLY be used for testing purposes.
 	InsecureTLS bool
 
@@ -77,7 +77,7 @@ type OAuthConfig struct {
 // LoadJWKS initializes the JWKS client.
 func (c *OAuthConfig) LoadJWKS(ctx context.Context) error {
 	if c.JwksURL == "" {
-		return fmt.Errorf("JWKS URL cannot be empty")
+		return nil
 	}
 
 	var override keyfunc.Override
@@ -100,16 +100,17 @@ func (c *OAuthConfig) LoadJWKS(ctx context.Context) error {
 // OAuthMiddleware is a middleware that performs OAuth 2.1 authorization.
 func (c *OAuthConfig) OAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if c.jwks == nil {
-			zap.L().Error("JWKS not initialized - call LoadJWKS() before using middleware")
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-
 		// If the token comes in the header no validation is done, it's passed
 		// through directly.
 		if token := r.Header.Get(tokenHeader); token != "" {
 			next.ServeHTTP(w, r.Clone(WithToken(r.Context(), token)))
+			return
+		}
+
+		// the Keyfunc is only needed to validate Auth tokens.
+		if c.jwks == nil {
+			zap.L().Error("JWKS not initialized - call LoadJWKS() before using middleware with Auth tokens")
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
 
