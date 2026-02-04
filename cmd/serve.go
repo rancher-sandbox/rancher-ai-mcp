@@ -63,7 +63,6 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return mcpServer
 	}, &mcp.StreamableHTTPOptions{})
 
-	// TODO: This uses a hard-coded "rancher:mcp" scope.
 	oauthConfig := middleware.NewOAuthConfig(authzServerURL, jwksURL, resourceURL, []string{"offline_access", "rancher:mcp"})
 	if insecure {
 		oauthConfig.InsecureTLS = true

@@ -35,7 +35,34 @@ const (
 
 var privateKey = mustGenerateRSAKey(2048)
 
-func TestOAuthMiddleware_ValidToken(t *testing.T) {
+func TestMiddlewareWithLegacyTokenHeader(t *testing.T) {
+	config := setupTestConfig(t, privateKey)
+	claims := jwt.MapClaims{
+		"iss":   config.AuthorizationServerURL,
+		"aud":   config.ResourceURL,
+		"scope": []any{testScope},
+		"exp":   time.Now().Add(1 * time.Hour).Unix(),
+		"iat":   time.Now().Unix(),
+	}
+	token := createTestToken(t, privateKey, claims)
+	handler := config.OAuthMiddleware(testHandler())
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.Header.Set("R_token", token)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", rr.Code)
+	}
+
+	expectedBody := "success with token " + token
+	if rr.Body.String() != expectedBody {
+		t.Errorf("Expected body %q, got %q", expectedBody, rr.Body)
+	}
+}
+
+func TestOAuthMiddlewareValidToken(t *testing.T) {
 	config := setupTestConfig(t, privateKey)
 	claims := jwt.MapClaims{
 		"iss":   config.AuthorizationServerURL,
@@ -58,11 +85,11 @@ func TestOAuthMiddleware_ValidToken(t *testing.T) {
 
 	expectedBody := "success with token " + token
 	if rr.Body.String() != expectedBody {
-		t.Errorf("Expected body %q, got %q", expectedBody, rr.Body.String())
+		t.Errorf("Expected body %q, got %q", expectedBody, rr.Body)
 	}
 }
 
-func TestOAuthMiddleware_NoAuthorizationHeader(t *testing.T) {
+func TestOAuthMiddlewareNoAuthorizationHeader(t *testing.T) {
 	config := setupTestConfig(t, privateKey)
 	handler := config.OAuthMiddleware(testHandler())
 	// Create request without Authorization header
@@ -93,7 +120,7 @@ func TestOAuthMiddleware_NoAuthorizationHeader(t *testing.T) {
 	}
 }
 
-func TestOAuthMiddleware_InvalidBearerFormat(t *testing.T) {
+func TestOAuthMiddlewareInvalidBearerFormat(t *testing.T) {
 	config := setupTestConfig(t, privateKey)
 	handler := config.OAuthMiddleware(testHandler())
 
@@ -109,7 +136,7 @@ func TestOAuthMiddleware_InvalidBearerFormat(t *testing.T) {
 	}
 }
 
-func TestOAuthMiddleware_InvalidTokenCases(t *testing.T) {
+func TestOAuthMiddlewareInvalidTokenCases(t *testing.T) {
 	config := setupTestConfig(t, privateKey)
 
 	// Generate a key with different algorithm for the wrong algorithm test
@@ -163,7 +190,7 @@ func TestOAuthMiddleware_InvalidTokenCases(t *testing.T) {
 	}
 }
 
-func TestOAuthMiddleware_InvalidAudienceCases(t *testing.T) {
+func TestOAuthMiddlewareInvalidAudienceCases(t *testing.T) {
 	config := setupTestConfig(t, privateKey)
 
 	tests := map[string]struct {
@@ -209,7 +236,7 @@ func TestOAuthMiddleware_InvalidAudienceCases(t *testing.T) {
 	}
 }
 
-func TestOAuthMiddleware_InvalidIssuerCases(t *testing.T) {
+func TestOAuthMiddlewareInvalidIssuerCases(t *testing.T) {
 	config := setupTestConfig(t, privateKey)
 
 	tests := map[string]struct {
@@ -252,7 +279,7 @@ func TestOAuthMiddleware_InvalidIssuerCases(t *testing.T) {
 	}
 }
 
-func TestOAuthMiddleware_InvalidScope(t *testing.T) {
+func TestOAuthMiddlewareInvalidScope(t *testing.T) {
 	config := setupTestConfig(t, privateKey)
 	// Create token with wrong scope
 	claims := jwt.MapClaims{
@@ -277,7 +304,7 @@ func TestOAuthMiddleware_InvalidScope(t *testing.T) {
 	}
 }
 
-func TestOAuthMiddleware_ExpiredToken(t *testing.T) {
+func TestOAuthMiddlewareExpiredToken(t *testing.T) {
 	config := setupTestConfig(t, privateKey)
 
 	// Create expired token
@@ -304,7 +331,7 @@ func TestOAuthMiddleware_ExpiredToken(t *testing.T) {
 	}
 }
 
-func TestOAuthMiddleware_ExpiredWithinLeeway(t *testing.T) {
+func TestOAuthMiddlewareExpiredWithinLeeway(t *testing.T) {
 	config := setupTestConfig(t, privateKey)
 
 	// Token expired 5 seconds ago (within 10s leeway) should still be accepted.
@@ -330,7 +357,7 @@ func TestOAuthMiddleware_ExpiredWithinLeeway(t *testing.T) {
 	}
 }
 
-func TestOAuthMiddleware_ExpiredBeyondLeeway(t *testing.T) {
+func TestOAuthMiddlewareExpiredBeyondLeeway(t *testing.T) {
 	config := setupTestConfig(t, privateKey)
 
 	// Token expired 2 minutes ago (beyond 60s leeway) should be rejected.
@@ -356,7 +383,7 @@ func TestOAuthMiddleware_ExpiredBeyondLeeway(t *testing.T) {
 	}
 }
 
-func TestOAuthMiddleware_AudienceAsArray(t *testing.T) {
+func TestOAuthMiddlewareAudienceAsArray(t *testing.T) {
 	config := setupTestConfig(t, privateKey)
 
 	// Create token with audience as array including our resource
@@ -383,11 +410,11 @@ func TestOAuthMiddleware_AudienceAsArray(t *testing.T) {
 
 	want := "success with token " + token
 	if rr.Body.String() != want {
-		t.Errorf("Expected body '%s', got '%s'", want, rr.Body.String())
+		t.Errorf("Expected body '%s', got '%s'", want, rr.Body)
 	}
 }
 
-func TestOAuthMiddleware_MultipleScopes(t *testing.T) {
+func TestOAuthMiddlewareMultipleScopes(t *testing.T) {
 	config := setupTestConfig(t, privateKey)
 
 	// Create token with multiple scopes including required one
@@ -454,7 +481,7 @@ func TestHandleProtectedResourceMetadata(t *testing.T) {
 	}
 }
 
-func TestHandleProtectedResourceMetadata_OPTIONS(t *testing.T) {
+func TestHandleProtectedResourceMetadataOPTIONS(t *testing.T) {
 	config := &OAuthConfig{
 		AuthorizationServerURL: testAuthServerURL,
 		JwksURL:                testAuthServerURL + "/.well-known/jwks.json",
@@ -528,7 +555,7 @@ func TestValidateScope(t *testing.T) {
 	}
 }
 
-func TestOAuthMiddleware_CustomScopes(t *testing.T) {
+func TestOAuthMiddlewareCustomScopes(t *testing.T) {
 	config := setupTestConfig(t, privateKey)
 	// Configure custom scopes
 	config.SupportedScopes = []string{testCustomScope1, testCustomScope2}
@@ -537,7 +564,7 @@ func TestOAuthMiddleware_CustomScopes(t *testing.T) {
 	claims := jwt.MapClaims{
 		"iss":   config.AuthorizationServerURL,
 		"aud":   config.ResourceURL,
-		"scope": []any{testCustomScope1, testCustomScope2, "offline_offline_Access"},
+		"scope": []any{testCustomScope1, testCustomScope2, "offline_access"},
 		"exp":   time.Now().Add(1 * time.Hour).Unix(),
 		"iat":   time.Now().Unix(),
 	}
@@ -558,11 +585,11 @@ func TestOAuthMiddleware_CustomScopes(t *testing.T) {
 
 	want := "success with token " + token
 	if rr.Body.String() != want {
-		t.Errorf("Expected body '%s', got '%s'", want, rr.Body.String())
+		t.Errorf("Expected body '%s', got '%s'", want, rr.Body)
 	}
 }
 
-func TestOAuthMiddleware_CustomScopes_Invalid(t *testing.T) {
+func TestOAuthMiddlewareCustomScopesInvalid(t *testing.T) {
 	config := setupTestConfig(t, privateKey)
 
 	// Configure custom scopes
@@ -592,7 +619,7 @@ func TestOAuthMiddleware_CustomScopes_Invalid(t *testing.T) {
 	}
 }
 
-func TestHandleProtectedResourceMetadata_CustomScopes(t *testing.T) {
+func TestHandleProtectedResourceMetadataCustomScopes(t *testing.T) {
 	config := &OAuthConfig{
 		AuthorizationServerURL: testAuthServerURL,
 		JwksURL:                testAuthServerURL + "/.well-known/jwks.json",
@@ -731,7 +758,7 @@ func TestNewOAuthConfig(t *testing.T) {
 	}
 }
 
-func TestLoadJWKS_EmptyURL(t *testing.T) {
+func TestLoadJWKSEmptyURL(t *testing.T) {
 	config := &OAuthConfig{
 		JwksURL: "",
 	}
@@ -746,7 +773,7 @@ func TestLoadJWKS_EmptyURL(t *testing.T) {
 	}
 }
 
-func TestOAuthMiddleware_JWKSNotLoaded(t *testing.T) {
+func TestOAuthMiddlewareJWKSNotLoaded(t *testing.T) {
 	// Create config without loading JWKS
 	config := &OAuthConfig{
 		AuthorizationServerURL: testAuthServerURL,
@@ -768,7 +795,7 @@ func TestOAuthMiddleware_JWKSNotLoaded(t *testing.T) {
 	}
 }
 
-func TestSendUnauthorized_URLJoinError(t *testing.T) {
+func TestSendUnauthorizedURLJoinError(t *testing.T) {
 	// Create config with invalid ResourceURL that will cause url.JoinPath to fail
 	config := &OAuthConfig{
 		ResourceURL: "://invalid-url", // Invalid URL scheme
@@ -782,7 +809,7 @@ func TestSendUnauthorized_URLJoinError(t *testing.T) {
 	}
 }
 
-func TestHandleProtectedResourceMetadata_CORSHeaders(t *testing.T) {
+func TestHandleProtectedResourceMetadataCORSHeaders(t *testing.T) {
 	config := &OAuthConfig{
 		AuthorizationServerURL: testAuthServerURL,
 		JwksURL:                testAuthServerURL + "/.well-known/jwks.json",

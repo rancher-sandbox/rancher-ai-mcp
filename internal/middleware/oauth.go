@@ -24,6 +24,9 @@ const expirationLeeway = 10 * time.Second
 // signingMethod defines the JWT signing algorithm accepted by this server.
 const signingMethod = "RS256"
 
+// tokenHeader is an alternative header with a token
+const tokenHeader = "R_token"
+
 // CORS constants for the protected resource metadata endpoint.
 const (
 	corsAllowOrigin  = "*"
@@ -100,6 +103,13 @@ func (c *OAuthConfig) OAuthMiddleware(next http.Handler) http.Handler {
 		if c.jwks == nil {
 			zap.L().Error("JWKS not initialized - call LoadJWKS() before using middleware")
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		// If the token comes in the header no validation is done, it's passed
+		// through directly.
+		if token := r.Header.Get(tokenHeader); token != "" {
+			next.ServeHTTP(w, r.Clone(WithToken(r.Context(), token)))
 			return
 		}
 
