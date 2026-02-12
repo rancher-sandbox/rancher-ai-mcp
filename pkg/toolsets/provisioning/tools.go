@@ -65,4 +65,36 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		machineName (string): The name of the machine to get
 		`},
 		t.GetClusterMachine)
+	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "listK3kClusters",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
+		Description: `List K3k virtual clusters deployed across downstream clusters.
+
+		Parameters:
+		clusters (array of strings): List of clusters to get virtual clusters from. Empty for return virtual clusters for all clusters.
+		`},
+		t.getK3kClusters)
+	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "createK3kCluster",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
+		Description: `Create a new K3k cluster in a specific downstream cluster.
+
+		Parameters:
+		name (string): The name of the K3k cluster.
+		namespace (string): The namespace where the K3k cluster will be created.
+		targetCluster (string): The downstream cluster where the K3k resource will be applied.
+		version (string): Optional. The k3s/k8s version for the cluster (e.g., 'v1.33.1-k3s1'). Defaults to 'host cluster version'.
+		mode (string): Optional. Cluster mode (e.g., 'shared' or 'virtual'). Defaults to 'shared'.
+		servers (int): Optional. Number of server (control plane) nodes. Defaults to 1.
+		agents (int): Optional. Number of agent (worker) nodes. Defaults to 0.
+		sync (object): Optional. shared mode only. Resource synchronization options with boolean flags for 'priorityClasses' and 'ingresses'.
+		serverLimit (object): Optional. Resource constraints for server nodes (contains 'cpu' and 'memory' strings).
+		workerLimit (object): Optional. Resource constraints for worker nodes (contains 'cpu' and 'memory' strings).
+		persistence (object): Optional. Storage settings for etcd data (contains 'type' ('dynamic' or 'ephemeral'), 'storageClassName', 'storageRequest' strings).
+		`},
+		t.createK3kCluster)
 }

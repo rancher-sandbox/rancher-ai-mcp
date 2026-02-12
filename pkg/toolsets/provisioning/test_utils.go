@@ -41,6 +41,13 @@ func capiCustomListKinds() map[schema.GroupVersionResource]string {
 	}
 }
 
+// k3kCustomListKinds returns a map of custom list kinds for K3k resources
+func k3kCustomListKinds() map[schema.GroupVersionResource]string {
+	return map[schema.GroupVersionResource]string{
+		{Group: "k3k.io", Version: "v1beta1", Resource: "clusters"}: "ClusterList",
+	}
+}
+
 // clientsetWithCAPIDiscovery wraps a fake clientset and overrides Discovery to return CAPI groups
 type clientsetWithCAPIDiscovery struct {
 	*fake.Clientset
@@ -343,6 +350,30 @@ func newMachinePool(name, nodeConfigName, nodeConfigKind string, quantity int) p
 			APIVersion: "rke-machine-config.cattle.io/v1",
 			Kind:       nodeConfigKind,
 			Name:       nodeConfigName,
+		},
+	}
+}
+
+// newK3kCluster creates a K3k virtual cluster
+func newK3kCluster(name string, mode string, version string, servers int, agents int) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "k3k.io/v1beta1",
+			"kind":       "Cluster",
+			"metadata": map[string]interface{}{
+				"name":      name,
+				"namespace": "default",
+			},
+			"spec": map[string]interface{}{
+				"mode":    mode,
+				"servers": int64(servers),
+				"version": version,
+				"agents":  int64(agents),
+			},
+			"status": map[string]interface{}{
+				"ready": true,
+				"phase": "Running",
+			},
 		},
 	}
 }

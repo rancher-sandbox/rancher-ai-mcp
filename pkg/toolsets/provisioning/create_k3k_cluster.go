@@ -1,0 +1,162 @@
+package provisioning
+
+import (
+	"context"
+	"fmt"
+
+	"mcp/internal/middleware"
+	"mcp/pkg/converter"
+	"mcp/pkg/response"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"go.uber.org/zap"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+)
+
+// ResourceLimits defines CPU and Memory constraints for nodes.
+type ResourceLimits struct {
+	CPU    string `json:"cpu,omitempty" jsonschema:"CPU limit, e.g., '1' or '500m'"`
+	Memory string `json:"memory,omitempty" jsonschema:"Memory limit, e.g., '2Gi' or '512Mi'"`
+}
+
+// PersistenceConfig defines the storage settings for etcd data.
+type PersistenceConfig struct {
+	Type             string `json:"type,omitempty" jsonschema:"Type of persistence, e.g., 'pvc' or 'ephemeral'"`
+	StorageClassName string `json:"storageClassName,omitempty" jsonschema:"Storage class to use for PVC"`
+	StorageRequest   string `json:"storageRequest,omitempty" jsonschema:"Size of the storage request, e.g., '5Gi'"`
+}
+
+// SyncConfig defines resource synchronization settings.
+type SyncConfig struct {
+	PriorityClasses bool `json:"priorityClasses,omitempty" jsonschema:"sync priorityClasses"`
+	Ingresses       bool `json:"ingresses,omitempty" jsonschema:"sync ingress resources"`
+}
+
+// createK3kClusterParams defines the strict structure for creating a K3k resource.
+type createK3kClusterParams struct {
+	Name          string             `json:"name" jsonschema:"the name of the K3k cluster"`
+	Namespace     string             `json:"namespace" jsonschema:"the namespace where the K3k cluster will be created"`
+	TargetCluster string             `json:"targetCluster" jsonschema:"the downstream cluster where the K3k resource will be applied"`
+	Version       string             `json:"version,omitempty" jsonschema:"the k3s/k8s version for the cluster"`
+	Mode          string             `json:"mode,omitempty" jsonschema:"cluster mode, e.g., 'shared', 'virtual', or 'ephemeral'"`
+	Servers       int32              `json:"servers,omitempty" jsonschema:"number of server (control plane) nodes"`
+	Agents        int32              `json:"agents,omitempty" jsonschema:"number of agent (worker) nodes"`
+	Sync          *SyncConfig        `json:"sync,omitempty" jsonschema:"resource synchronization options"`
+	ServerLimit   *ResourceLimits    `json:"serverLimit,omitempty" jsonschema:"resource limits for server nodes"`
+	WorkerLimit   *ResourceLimits    `json:"workerLimit,omitempty" jsonschema:"resource limits for worker nodes"`
+	Persistence   *PersistenceConfig `json:"persistence,omitempty" jsonschema:"persistence configuration for etcd"`
+}
+
+// createK3kCluster creates a new K3k cluster using structured input parameters.
+func (t *Tools) createK3kCluster(ctx context.Context, toolReq *mcp.CallToolRequest, params createK3kClusterParams) (*mcp.CallToolResult, any, error) {
+	zap.L().Debug("createK3kCluster called")
+	spec := map[string]interface{}{}
+
+	if params.Version != "" {
+		spec["version"] = params.Version
+	}
+	if params.Mode != "" {
+		spec["mode"] = params.Mode
+	}
+	if params.Servers > 0 {
+		spec["servers"] = int64(params.Servers)
+	}
+	if params.Agents > 0 {
+		spec["agents"] = int64(params.Agents)
+	}
+
+	// 3. Add nested structs only if the LLM provided them (they are pointers)
+	if params.Sync != nil {
+		syncMap := map[string]interface{}{}
+		if params.Sync.Ingresses {
+			syncMap["ingresses"] = map[string]interface{}{
+				"enabled": true,
+			}
+		}
+		if params.Sync.PriorityClasses {
+			syncMap["priorityClasses"] = map[string]interface{}{
+				"enabled": true,
+			}
+		}
+		if len(syncMap) > 0 {
+			spec["sync"] = syncMap
+		}
+	}
+
+	if params.ServerLimit != nil {
+		lim := map[string]interface{}{}
+		if params.ServerLimit.CPU != "" {
+			lim["cpu"] = params.ServerLimit.CPU
+		}
+		if params.ServerLimit.Memory != "" {
+			lim["memory"] = params.ServerLimit.Memory
+		}
+		if len(lim) > 0 {
+			spec["serverLimit"] = lim
+		}
+	}
+
+	if params.WorkerLimit != nil {
+		lim := map[string]interface{}{}
+		if params.WorkerLimit.CPU != "" {
+			lim["cpu"] = params.WorkerLimit.CPU
+		}
+		if params.WorkerLimit.Memory != "" {
+			lim["memory"] = params.WorkerLimit.Memory
+		}
+		if len(lim) > 0 {
+			spec["workerLimit"] = lim
+		}
+	}
+
+	if params.Persistence != nil {
+		p := map[string]interface{}{}
+		if params.Persistence.Type != "" {
+			p["type"] = params.Persistence.Type
+		}
+		if params.Persistence.StorageClassName != "" {
+			p["storageClassName"] = params.Persistence.StorageClassName
+		}
+		if params.Persistence.StorageRequest != "" {
+			p["storageRequest"] = params.Persistence.StorageRequest
+		}
+		if len(p) > 0 {
+			spec["persistence"] = p
+		}
+	}
+
+	unstructuredObj := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "k3k.io/v1beta1",
+			"kind":       "Cluster",
+			"metadata": map[string]interface{}{
+				"name":      params.Name,
+				"namespace": params.Namespace,
+			},
+			"spec": spec,
+		},
+	}
+
+	resourceInterface, err := t.client.GetResourceInterface(ctx, middleware.Token(ctx), toolReq.Extra.Header.Get(urlHeader), params.Namespace, params.TargetCluster, converter.K8sKindsToGVRs["k3kcluster"])
+	if err != nil {
+		zap.L().Error("failed to get resource interface", zap.String("tool", "createK3kCluster"), zap.Error(err))
+		return nil, nil, err
+	}
+
+	obj, err := resourceInterface.Create(ctx, unstructuredObj, metav1.CreateOptions{})
+	if err != nil {
+		zap.L().Error("failed to create K3k cluster", zap.String("tool", "createK3kCluster"), zap.Error(err))
+		return nil, nil, fmt.Errorf("failed to create K3k cluster %s: %w", params.Name, err)
+	}
+
+	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{obj}, params.TargetCluster)
+	if err != nil {
+		zap.L().Error("failed to create mcp response", zap.String("tool", "createK3kCluster"), zap.Error(err))
+		return nil, nil, err
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: mcpResponse}},
+	}, nil, nil
+}
