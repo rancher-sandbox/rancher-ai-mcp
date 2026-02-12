@@ -44,7 +44,8 @@ func capiCustomListKinds() map[schema.GroupVersionResource]string {
 // k3kCustomListKinds returns a map of custom list kinds for K3k resources
 func k3kCustomListKinds() map[schema.GroupVersionResource]string {
 	return map[schema.GroupVersionResource]string{
-		{Group: "k3k.io", Version: "v1beta1", Resource: "clusters"}: "ClusterList",
+		{Group: "k3k.io", Version: "v1beta1", Resource: "clusters"}:          "ClusterList",
+		{Group: "management.cattle.io", Version: "v3", Resource: "clusters"}: "ClusterList",
 	}
 }
 

@@ -14,26 +14,22 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-// ResourceLimits defines CPU and Memory constraints for nodes.
 type ResourceLimits struct {
 	CPU    string `json:"cpu,omitempty" jsonschema:"CPU limit, e.g., '1' or '500m'"`
 	Memory string `json:"memory,omitempty" jsonschema:"Memory limit, e.g., '2Gi' or '512Mi'"`
 }
 
-// PersistenceConfig defines the storage settings for etcd data.
 type PersistenceConfig struct {
 	Type             string `json:"type,omitempty" jsonschema:"Type of persistence, e.g., 'pvc' or 'ephemeral'"`
 	StorageClassName string `json:"storageClassName,omitempty" jsonschema:"Storage class to use for PVC"`
 	StorageRequest   string `json:"storageRequest,omitempty" jsonschema:"Size of the storage request, e.g., '5Gi'"`
 }
 
-// SyncConfig defines resource synchronization settings.
 type SyncConfig struct {
 	PriorityClasses bool `json:"priorityClasses,omitempty" jsonschema:"sync priorityClasses"`
 	Ingresses       bool `json:"ingresses,omitempty" jsonschema:"sync ingress resources"`
 }
 
-// createK3kClusterParams defines the strict structure for creating a K3k resource.
 type createK3kClusterParams struct {
 	Name          string             `json:"name" jsonschema:"the name of the K3k cluster"`
 	Namespace     string             `json:"namespace" jsonschema:"the namespace where the K3k cluster will be created"`
@@ -66,7 +62,6 @@ func (t *Tools) createK3kCluster(ctx context.Context, toolReq *mcp.CallToolReque
 		spec["agents"] = int64(params.Agents)
 	}
 
-	// 3. Add nested structs only if the LLM provided them (they are pointers)
 	if params.Sync != nil {
 		syncMap := map[string]interface{}{}
 		if params.Sync.Ingresses {

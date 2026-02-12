@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/rest"
@@ -21,11 +20,6 @@ func TestCreateK3kCluster(t *testing.T) {
 	fakeToken := "fakeToken"
 	scheme := runtime.NewScheme()
 
-	listKinds := map[schema.GroupVersionResource]string{
-		{Group: "k3k.io", Version: "v1beta1", Resource: "clusters"}:          "ClusterList",
-		{Group: "management.cattle.io", Version: "v3", Resource: "clusters"}: "ClusterList",
-	}
-
 	tests := map[string]struct {
 		params         createK3kClusterParams
 		fakeDynClient  *dynamicfake.FakeDynamicClient
@@ -33,7 +27,7 @@ func TestCreateK3kCluster(t *testing.T) {
 		expectedResult string
 	}{
 		"create cluster with minimum parameters (tests defaults)": {
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, listKinds, newManagementCluster("downstream-1", true)),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, k3kCustomListKinds(), newManagementCluster("downstream-1", true)),
 			params: createK3kClusterParams{
 				Name:          "min-cluster",
 				Namespace:     "default",
@@ -63,7 +57,7 @@ func TestCreateK3kCluster(t *testing.T) {
 			}`,
 		},
 		"create cluster with advanced optional parameters": {
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, listKinds, newManagementCluster("downstream-2", true)),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, k3kCustomListKinds(), newManagementCluster("downstream-2", true)),
 			params: createK3kClusterParams{
 				Name:          "adv-cluster",
 				Namespace:     "default",

@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/rest"
@@ -21,11 +20,6 @@ func TestGetK3kClusters(t *testing.T) {
 	fakeToken := "fakeToken"
 	scheme := runtime.NewScheme()
 
-	listKinds := map[schema.GroupVersionResource]string{
-		{Group: "k3k.io", Version: "v1beta1", Resource: "clusters"}:          "ClusterList",
-		{Group: "management.cattle.io", Version: "v3", Resource: "clusters"}: "ClusterList",
-	}
-
 	tests := map[string]struct {
 		params         getK3kClustersParams
 		fakeDynClient  *dynamicfake.FakeDynamicClient
@@ -34,7 +28,7 @@ func TestGetK3kClusters(t *testing.T) {
 	}{
 		"get K3k clusters from single specified cluster": {
 			params:        getK3kClustersParams{Clusters: []string{"local"}},
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, listKinds, newK3kCluster("test-k3k-cluster", "shared", "v1.33.1-k3s1", 3, 0)),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, k3kCustomListKinds(), newK3kCluster("test-k3k-cluster", "shared", "v1.33.1-k3s1", 3, 0)),
 			expectedResult: `{
 				"local": [
 					{
@@ -55,7 +49,7 @@ func TestGetK3kClusters(t *testing.T) {
 		},
 		"get K3k clusters from empty cluster list (auto-discovery)": {
 			params:        getK3kClustersParams{Clusters: []string{}},
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, listKinds, newManagementCluster("downstream-1", true), newK3kCluster("test-k3k-cluster", "shared", "v1.33.1-k3s1", 3, 0)),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, k3kCustomListKinds(), newManagementCluster("downstream-1", true), newK3kCluster("test-k3k-cluster", "shared", "v1.33.1-k3s1", 3, 0)),
 			expectedResult: `{
 				"downstream-1": [
 					{
@@ -76,7 +70,7 @@ func TestGetK3kClusters(t *testing.T) {
 		},
 		"get K3k clusters from cluster with no K3k deployments": {
 			params:        getK3kClustersParams{Clusters: []string{"local"}},
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, listKinds),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, k3kCustomListKinds()),
 			expectedResult: `{
 				"local": null
 			}`,

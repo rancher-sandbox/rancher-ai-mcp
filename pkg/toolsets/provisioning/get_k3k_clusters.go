@@ -17,7 +17,6 @@ type getK3kClustersParams struct {
 	Clusters []string `json:"clusters" jsonschema:"the downstream clusters to query for K3k clusters"`
 }
 
-// K3kClusterDetails holds the core information about a K3k cluster.
 type K3kClusterDetails struct {
 	Name   string                 `json:"name"`
 	Spec   map[string]interface{} `json:"spec,omitempty"`
@@ -62,11 +61,8 @@ func (t *Tools) getK3kClusters(ctx context.Context, toolReq *mcp.CallToolRequest
 		} else {
 			var clusterDetails []K3kClusterDetails
 			for _, k3kCluster := range k3kClusters {
-				// Safely pull out spec and status as maps.
-				// If they don't exist yet (e.g., cluster is just initializing), they gracefully return nil maps.
 				spec, _, _ := unstructured.NestedMap(k3kCluster.Object, "spec")
 				status, _, _ := unstructured.NestedMap(k3kCluster.Object, "status")
-
 				clusterDetails = append(clusterDetails, K3kClusterDetails{
 					Name:   k3kCluster.GetName(),
 					Spec:   spec,
