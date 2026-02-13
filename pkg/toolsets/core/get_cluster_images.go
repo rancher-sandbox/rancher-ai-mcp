@@ -28,7 +28,7 @@ func (t *Tools) getClusterImages(ctx context.Context, toolReq *mcp.CallToolReque
 	if len(params.Clusters) == 0 {
 		clusterList, err := t.client.GetResources(ctx, client.ListParams{
 			Cluster: "local",
-			Kind:    "cluster",
+			Kind:    "managementcluster",
 			URL:     toolReq.Extra.Header.Get(urlHeader),
 			Token:   middleware.Token(ctx),
 		})

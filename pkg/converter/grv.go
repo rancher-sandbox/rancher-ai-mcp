@@ -106,6 +106,7 @@ var K8sKindsToGVRs = map[string]schema.GroupVersionResource{
 
 	// --- RANCHER PROVISIONING Resources (Group: "provisioning.cattle.io") ---
 	ProvisioningClusterResourceKind: {Group: ProvisioningGroup, Version: "v1", Resource: "clusters"},
+	"k3kcluster":                    {Group: "k3k.io", Version: "v1beta1", Resource: "clusters"},
 
 	// --- RANCHER FLEET Resources (Group: "fleet.cattle.io") ---
 	"bundle":           {Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "bundles"},
