@@ -5,4 +5,6 @@ RUN go build -o mcp
 
 FROM registry.suse.com/bci/bci-micro:15.7
 COPY --from=builder /app/mcp /mcp
+USER 1000:1000
+
 CMD ["/mcp"]
