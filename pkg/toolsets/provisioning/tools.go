@@ -97,4 +97,16 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		persistence (object): Optional. Storage settings for etcd data (contains 'type' ('dynamic' or 'ephemeral'), 'storageClassName', 'storageRequest' strings).
 		`},
 		t.createK3kCluster)
+	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "listSupportedKubernetesVersions",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
+		Description: `Returns the currently supported rke2 and k3s versions that can be provisioned.
+   					  This should only be used when information about the supported rke2 and k3s is needed. This is often required to support provisioning custom and imported clusters.'
+
+		Parameters:
+		distribution (string, required): The distribution of the cluster, either "rke2" or "k3s".
+		`},
+		t.ListSupportedKubernetesVersions)
 }

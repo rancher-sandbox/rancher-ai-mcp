@@ -2,7 +2,12 @@ package provisioning
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"slices"
+	"strconv"
 	"strings"
 
 	"mcp/pkg/client"
@@ -66,7 +71,7 @@ func (t *Tools) getCAPIMachineResourcesByName(ctx context.Context, toolReq *mcp.
 			zap.Error(err))
 		return nil, nil, nil, fmt.Errorf("failed to get machine: %w", err)
 	}
-	log.Info("found CAPI machine",
+	log.Debug("found CAPI machine",
 		zap.String("namespace", params.namespace),
 		zap.String("machine", params.machineName))
 
@@ -108,7 +113,7 @@ func (t *Tools) getCAPIMachineResourcesByName(ctx context.Context, toolReq *mcp.
 			zap.String("machine", params.machineName))
 		return capiMachine, nil, nil, nil
 	}
-	log.Info("found CAPI machine set",
+	log.Debug("found CAPI machine set",
 		zap.String("namespace", params.namespace),
 		zap.String("machine", params.machineName),
 		zap.String("machineSet", capiMachineSet.GetName()))
@@ -152,7 +157,7 @@ func (t *Tools) getCAPIMachineResourcesByName(ctx context.Context, toolReq *mcp.
 	}
 
 	if capiMachineDeployment != nil {
-		log.Info("found CAPI machine deployment",
+		log.Debug("found CAPI machine deployment",
 			zap.String("namespace", params.namespace),
 			zap.String("machine", params.machineName),
 			zap.String("machineDeployment", capiMachineDeployment.GetName()))
@@ -205,7 +210,7 @@ func (t *Tools) getAllCAPIMachineResources(ctx context.Context, toolReq *mcp.Cal
 	}
 	if err == nil {
 		capiMachineDeployments = deployments
-		log.Info("found CAPI machine deployments",
+		log.Debug("found CAPI machine deployments",
 			zap.String("namespace", params.namespace),
 			zap.String("targetCluster", params.targetCluster),
 			zap.Int("count", len(capiMachineDeployments)))
@@ -235,7 +240,7 @@ func (t *Tools) getAllCAPIMachineResources(ctx context.Context, toolReq *mcp.Cal
 	}
 	if err == nil {
 		capiMachineSets = machineSets
-		log.Info("found CAPI machine sets",
+		log.Debug("found CAPI machine sets",
 			zap.String("namespace", params.namespace),
 			zap.String("targetCluster", params.targetCluster),
 			zap.Int("count", len(capiMachineSets)))
@@ -265,7 +270,7 @@ func (t *Tools) getAllCAPIMachineResources(ctx context.Context, toolReq *mcp.Cal
 	}
 	if err == nil {
 		capiMachines = machines
-		log.Info("found CAPI machines",
+		log.Debug("found CAPI machines",
 			zap.String("namespace", params.namespace),
 			zap.String("targetCluster", params.targetCluster),
 			zap.Int("count", len(capiMachines)))
@@ -320,7 +325,7 @@ func (t *Tools) getProvisioningCluster(ctx context.Context, toolReq *mcp.CallToo
 		return nil, provCluster, err
 	}
 
-	log.Info("successfully retrieved provisioning cluster",
+	log.Debug("successfully retrieved provisioning cluster",
 		zap.String("namespace", ns),
 		zap.String("cluster", clusterName))
 	return provisioningClusterResource, provCluster, nil
@@ -390,8 +395,131 @@ func (t *Tools) getMachinePoolConfigs(ctx context.Context, toolReq *mcp.CallTool
 		resources = append(resources, config)
 	}
 
-	log.Info("successfully retrieved machine pool configs",
+	log.Debug("successfully retrieved machine pool configs",
 		zap.String("cluster", provCluster.Name),
 		zap.Int("configCount", len(resources)))
 	return resources, nil
+}
+
+func supportedKubernetesVersion(url, distro, version string, log *zap.Logger) (string, []string, bool, error) {
+	versions, err := getKDMReleases(url, distro)
+	if err != nil {
+		return "", nil, false, err
+	}
+
+	distroVersion := fmt.Sprintf("%s+%s", version, distro)
+	log.Debug("Looking for Kubernetes version", zap.String("version", distroVersion))
+	var potentialVersions []string
+	for _, ver := range versions {
+		// If the user has explicitly requested a complete version (v1.33.3+rke2r1, v1.33.3+k3s1, etc.) and it is available, use it.
+		// otherwise we need to find the latest release for that version.
+		if ver == version {
+			return version, versions, true, nil
+		}
+		if strings.Contains(ver, distroVersion) {
+			log.Debug("found a potential match for the requested Kubernetes version and distro", zap.String("potentialVersion", ver))
+			potentialVersions = append(potentialVersions, ver)
+		}
+	}
+
+	if len(potentialVersions) == 0 {
+		log.Debug("no potential versions found matching the requested Kubernetes version and distro", zap.String("version", version), zap.String("distro", distro))
+		return "", versions, false, nil
+	}
+
+	latestVersionString := ""
+	latestVersion := 0
+	split := "rke2r"
+	if distro == "k3s" {
+		split = "k3s"
+	}
+
+	log.Debug("looking for the latest Kubernetes version matching the requested version and distro", zap.String("version", version), zap.String("distro", distro))
+	for _, potentialVersion := range potentialVersions {
+		_, releaseVersion, found := strings.Cut(potentialVersion, split)
+		if !found {
+			log.Debug("failed to parse potential version, skipping", zap.String("potentialVersion", potentialVersion))
+			continue
+		}
+		verInt, err := strconv.Atoi(releaseVersion)
+		if err != nil {
+			log.Debug("failed to convert release version to integer, skipping", zap.String("releaseVersion", releaseVersion), zap.Error(err))
+			continue
+		}
+		if verInt > latestVersion {
+			log.Debug("found a new latest version", zap.String("potentialVersion", potentialVersion), zap.Int("releaseVersion", verInt))
+			latestVersion = verInt
+			latestVersionString = potentialVersion
+		}
+	}
+
+	if latestVersionString == "" {
+		log.Debug("no latest version found, unsupported kubernetes version", zap.String("version", version))
+		return "", versions, false, nil
+	}
+
+	log.Debug("successfully found Kubernetes version", zap.String("version", latestVersionString))
+	return latestVersionString, versions, true, nil
+}
+
+// getKDMReleases fetches the list of available Kubernetes versions for the specified Rancher server
+func getKDMReleases(url, distro string) ([]string, error) {
+	if distro != "rke2" && distro != "k3s" {
+		return nil, fmt.Errorf("invalid distro: %s. Valid values are 'rke2' and 'k3s'", distro)
+	}
+
+	resp, err := http.DefaultClient.Get(fmt.Sprintf("%s/v1-%s-release/releases", url, distro))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get KDM releases: %w", err)
+	}
+
+	kdm := make(map[string]interface{})
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read KDM response body: %w", err)
+	}
+
+	resp.Body.Close()
+	err = json.Unmarshal(b, &kdm)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal KDM response: %w", err)
+	}
+
+	allReleases, ok := kdm["data"].([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("invalid KDM response format: missing 'data' field")
+	}
+
+	var versions []string
+	for _, release := range allReleases {
+		currentRelease, ok := release.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("invalid KDM response format: release is not an object")
+		}
+		currentVersion, ok := currentRelease["version"].(string)
+		if !ok {
+			return nil, fmt.Errorf("invalid KDM response format: release version is not a string")
+		}
+		versions = append(versions, currentVersion)
+	}
+
+	return versions, nil
+}
+
+func supportedCNI(cni string) ([]string, bool) {
+	// NB: These are also hard-coded in the Rancher dashboard codebase.
+	supportedCNIS := []string{
+		"calico",
+		"canal",
+		"cilium",
+		"flannel",
+		"multus,canal",
+		"multus,cilium",
+		"multus,calico",
+		"none",
+	}
+	if !slices.Contains(supportedCNIS, cni) {
+		return supportedCNIS, false
+	}
+	return supportedCNIS, true
 }
