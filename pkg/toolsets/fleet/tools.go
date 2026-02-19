@@ -1,9 +1,8 @@
 package fleet
 
 import (
-	"mcp/pkg/client"
-
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/rancher/rancher-ai-mcp/pkg/client"
 )
 
 const (

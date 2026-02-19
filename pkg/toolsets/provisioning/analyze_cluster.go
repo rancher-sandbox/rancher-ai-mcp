@@ -3,12 +3,12 @@ package provisioning
 import (
 	"context"
 	"fmt"
-	"mcp/pkg/client"
-	"mcp/pkg/converter"
-	"mcp/pkg/response"
-	"mcp/pkg/utils"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/converter"
+	"github.com/rancher/rancher-ai-mcp/pkg/response"
+	"github.com/rancher/rancher-ai-mcp/pkg/utils"
 	"go.uber.org/zap"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"

@@ -2,9 +2,9 @@ package core
 
 import (
 	"context"
-	"mcp/pkg/client"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -142,5 +142,4 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Parameters:
 		clusters (array of strings): List of clusters to get images from. Empty for return images for all clusters.`},
 		t.getClusterImages)
-
 }

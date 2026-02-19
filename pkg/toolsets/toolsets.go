@@ -1,12 +1,11 @@
 package toolsets
 
 import (
-	"mcp/pkg/client"
-	"mcp/pkg/toolsets/core"
-	"mcp/pkg/toolsets/fleet"
-	"mcp/pkg/toolsets/provisioning"
-
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/toolsets/core"
+	"github.com/rancher/rancher-ai-mcp/pkg/toolsets/fleet"
+	"github.com/rancher/rancher-ai-mcp/pkg/toolsets/provisioning"
 )
 
 // toolsAdder is an interface for types that can add tools to an MCP server.

@@ -1,4 +1,4 @@
-module mcp
+module github.com/rancher/rancher-ai-mcp
 
 go 1.24.0
 

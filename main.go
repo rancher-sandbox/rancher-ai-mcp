@@ -1,7 +1,7 @@
 package main
 
 import (
-	"mcp/cmd"
+	"github.com/rancher/rancher-ai-mcp/cmd"
 )
 
 func main() {

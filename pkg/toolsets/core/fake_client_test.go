@@ -4,8 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"mcp/pkg/client"
-
+	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
