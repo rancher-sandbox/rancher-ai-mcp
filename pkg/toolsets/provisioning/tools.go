@@ -96,6 +96,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		clusters (array of strings): List of clusters to get virtual clusters from. Empty for return virtual clusters for all clusters.
 		`},
 		t.getK3kClusters)
+
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "createK3kCluster",
 		Meta: map[string]any{
@@ -117,6 +118,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		persistence (object): Optional. Storage settings for etcd data (contains 'type' ('dynamic' or 'ephemeral'), 'storageClassName', 'storageRequest' strings).
 		`},
 		t.createK3kCluster)
+
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "createImportedCluster",
 		Meta: map[string]any{

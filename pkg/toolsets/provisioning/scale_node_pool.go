@@ -38,9 +38,9 @@ func (t *Tools) ScaleClusterNodePool(ctx context.Context, toolReq *mcp.CallToolR
 		"cluster_id":       params.Cluster,
 		"namespace":        params.Namespace,
 		"nodePoolName":     params.NodePoolName,
-		"desiredSize":      strconv.Itoa(int(desiredSize)),
-		"amountToAdd":      strconv.Itoa(int(amountToAdd)),
-		"amountToSubtract": strconv.Itoa(int(amountToSubtract)),
+		"desiredSize":      strconv.Itoa(params.DesiredSize),
+		"amountToAdd":      strconv.Itoa(params.AmountToAdd),
+		"amountToSubtract": strconv.Itoa(params.AmountToSubtract),
 	})
 
 	log.Debug("Scaling cluster node pool")

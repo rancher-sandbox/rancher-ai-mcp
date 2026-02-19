@@ -44,13 +44,13 @@ func (t *Tools) CreateCustomCluster(ctx context.Context, toolReq *mcp.CallToolRe
 	}
 
 	if params.Distribution != "rke2" && params.Distribution != "k3s" {
-		log.Debug("invalid distribution", zap.String("distribution", params.Distribution))
+		log.Debug("invalid distribution")
 		return nil, nil, fmt.Errorf("invalid value for Distribution: %s. Valid values are 'rke2' and 'k3s'", params.Distribution)
 	}
 
 	allCNIs, cniSupported := supportedCNI(params.CNI)
 	if !cniSupported {
-		log.Debug("invalid CNI", zap.String("CNI", params.CNI))
+		log.Debug("invalid CNI")
 		return nil, nil, fmt.Errorf("unsupported CNI \"%s\". Valid values are \"%v\"", params.CNI, strings.Join(allCNIs, "\", \""))
 	}
 
@@ -61,7 +61,7 @@ func (t *Tools) CreateCustomCluster(ctx context.Context, toolReq *mcp.CallToolRe
 	}
 
 	if !supported {
-		log.Error("unsupported distribution", zap.String("distribution", params.Distribution))
+		log.Error("unsupported distribution")
 		return nil, nil, fmt.Errorf("unsupported Kubernetes version: %s for distribution: %s. Only support versions %v", params.KubernetesVersion, params.Distribution, allSupportedVersions)
 	}
 
@@ -113,13 +113,13 @@ func (t *Tools) CreateCustomCluster(ctx context.Context, toolReq *mcp.CallToolRe
 
 	objBytes, err := json.Marshal(custom)
 	if err != nil {
-		log.Error("failed to marshal resource", zap.String("tool", "createKubernetesResource"), zap.Error(err))
+		log.Error("failed to marshal resource", zap.Error(err))
 		return nil, nil, fmt.Errorf("failed to marshal resource: %w", err)
 	}
 
 	unstructuredObj := &unstructured.Unstructured{}
 	if err := json.Unmarshal(objBytes, unstructuredObj); err != nil {
-		log.Error("failed to create unstructured resource", zap.String("tool", "createKubernetesResource"), zap.Error(err))
+		log.Error("failed to create unstructured resource", zap.Error(err))
 		return nil, nil, fmt.Errorf("failed to create unstructured object: %w", err)
 	}
 
@@ -130,7 +130,7 @@ func (t *Tools) CreateCustomCluster(ctx context.Context, toolReq *mcp.CallToolRe
 
 	createdCluster, err := resourceInterface.Create(ctx, unstructuredObj, metav1.CreateOptions{})
 	if err != nil {
-		log.Error("failed to create resource", zap.String("tool", "createKubernetesResource"), zap.Error(err))
+		log.Error("failed to create resource", zap.Error(err))
 		return nil, nil, fmt.Errorf("failed to create resource %s: %w", params.ClusterName, err)
 	}
 

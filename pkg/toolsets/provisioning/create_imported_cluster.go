@@ -9,6 +9,7 @@ import (
 	"mcp/pkg/utils"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
@@ -75,7 +76,7 @@ func (t *Tools) CreateImportedCluster(ctx context.Context, toolReq *mcp.CallTool
 
 	createdCluster, err := resourceInterface.Create(ctx, cluster, metav1.CreateOptions{})
 	if err != nil {
-		log.Error(fmt.Sprintf("failed to create imported cluster: %v", err))
+		log.Error("failed to create imported cluster", zap.Error(err))
 		return nil, nil, fmt.Errorf("failed to create imported cluster %s: %w", params.ClusterName, err)
 	}
 
@@ -83,7 +84,7 @@ func (t *Tools) CreateImportedCluster(ctx context.Context, toolReq *mcp.CallTool
 
 	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{createdCluster}, LocalCluster)
 	if err != nil {
-		log.Error(fmt.Sprintf("failed to create mcp response: %v", err))
+		log.Error("failed to create mcp response", zap.Error(err))
 		return nil, nil, err
 	}
 
