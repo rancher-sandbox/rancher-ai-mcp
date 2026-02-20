@@ -147,8 +147,8 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "fleet-default",
 			},
-			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds(),
+			fakeClientset: newFakeClientSet(),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
 				fakeCAPIMachine, fakeCAPIMachine2, fakeCAPIMachineSet, fakeCAPIMachineDeployment),
 			expectedResult: `{
 				"llm": [
@@ -295,8 +295,8 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Cluster:   "empty-cluster",
 				Namespace: "fleet-default",
 			},
-			fakeClientset:  newFakeClientsetWithCAPIDiscovery(),
-			fakeDynClient:  dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds()),
+			fakeClientset:  newFakeClientSet(),
+			fakeDynClient:  dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds()),
 			expectedResult: `{"llm":"no resources found"}`,
 		},
 		"analyze cluster with default namespace": {
@@ -304,8 +304,8 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "",
 			},
-			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds(),
+			fakeClientset: newFakeClientSet(),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
 				fakeCAPIMachine, fakeCAPIMachineSet, fakeCAPIMachineDeployment),
 			expectedResult: `{
 				"llm": [
@@ -420,8 +420,8 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "fleet-default",
 			},
-			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds(),
+			fakeClientset: newFakeClientSet(),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
 				fakeCAPIMachine),
 			expectedResult: `{
 				"llm": [

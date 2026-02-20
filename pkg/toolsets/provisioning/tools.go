@@ -64,6 +64,26 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		machineName (string): The name of the machine to get
 		`},
 		t.GetClusterMachine)
+
+	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "scaleClusterNodePool",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
+		Description: `Changes the size of an existing node pool for an rke2 or k3s cluster.
+   					  This should be used when the user wants to change the size of an existing node pool for an rke2 or k3s cluster.
+                      Pools cannot be scaled to zero nodes, and etcd node pools cannot be scaled below 3 nodes to prevent loss of quorum.'
+
+		Parameters:
+		cluster (string): The name of the Kubernetes cluster.
+	    namespace (string): The namespace where the resource is located. The default namespace will be used if not provided.
+		nodePoolName (string): The name of the node pool to scale.
+		desiredSize (int, optional): The desired size of the node pool. Overridden by amountToAdd and amountToSubtract if either are specified. If no specific size is provided, use zero.
+		amountToAdd (int, optional): The amount of nodes to add to the node pool. If specified, desiredSize will be ignored. Cannot be used with amountToSubtract. If no specific amount is provided, use zero.
+		amountToSubtract (int, optional): The amount of nodes to remove from the node pool. If specified, desiredSize will be ignored. Cannot be used with amountToAdd. If no specific amount is provided, use zero.
+		`},
+		t.ScaleClusterNodePool)
+
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "listK3kClusters",
 		Meta: map[string]any{
@@ -75,6 +95,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		clusters (array of strings): List of clusters to get virtual clusters from. Empty for return virtual clusters for all clusters.
 		`},
 		t.getK3kClusters)
+
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "createK3kCluster",
 		Meta: map[string]any{
@@ -96,4 +117,49 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		persistence (object): Optional. Storage settings for etcd data (contains 'type' ('dynamic' or 'ephemeral'), 'storageClassName', 'storageRequest' strings).
 		`},
 		t.createK3kCluster)
+
+	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "createImportedCluster",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
+		Description: `Creates an imported cluster within Rancher.
+					  This should only be used when the user wants to create a new imported cluster. Do not use this tool when the user asks to create a new custom cluster.'
+	
+		Parameters:
+		clusterName (string, required): The name of the cluster to be created.
+	    description (string, optional): A short description added to the cluster.
+		versionManagementSetting (string, optional): Specifies the version management setting for the cluster. Potential values are 'system-default', 'true', and 'false'. If not specified, the global version management setting will be used.
+		`},
+		t.CreateImportedCluster)
+
+	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "createCustomCluster",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
+		Description: `Creates a custom cluster within Rancher.
+   					  This should only be used when the user wants to create a new custom cluster. Do not use this tool if a user asks to create an imported cluster.'
+
+		Parameters:
+		clusterName (string, required): The name of the cluster to be created.
+	    description (string, optional): A short description added to the cluster.
+		kubernetesVersion (string, required): The rke2 or k3s version that will be used for the cluster.
+		CNI (string, required): The CNI that will be used for the cluster.
+		distribution (string, required): The distribution of the cluster, either "rke2" or "k3s".
+		`},
+		t.CreateCustomCluster)
+
+	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "listSupportedKubernetesVersions",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
+		Description: `Returns the currently supported rke2 and k3s versions that can be provisioned.
+   					  This should only be used when information about the supported rke2 and k3s is needed. This is often required to support provisioning custom and imported clusters.'
+
+		Parameters:
+		distribution (string, required): The distribution of the cluster, either "rke2" or "k3s".
+		`},
+		t.ListSupportedKubernetesVersions)
 }
