@@ -2,13 +2,13 @@ package core
 
 import (
 	"context"
-	"mcp/pkg/client"
 	"net"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -1,9 +1,9 @@
 package toolsets
 
 import (
-	"mcp/pkg/client"
 	"testing"
 
+	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -3,10 +3,9 @@ package fleet
 import (
 	"context"
 
-	"mcp/pkg/client"
-	"mcp/pkg/response"
-
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/response"
 	"go.uber.org/zap"
 )
 

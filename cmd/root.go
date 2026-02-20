@@ -3,6 +3,7 @@ package cmd
 import (
 	"strings"
 
+	"github.com/rancher/rancher-ai-mcp/pkg/version"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -20,6 +21,7 @@ or update Kubernetes and Rancher resources across local and downstream clusters.
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		initLogger()
 	},
+	Version: version.GetVersion(),
 }
 
 // Execute runs the root command

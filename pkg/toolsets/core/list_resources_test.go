@@ -3,10 +3,9 @@ package core
 import (
 	"testing"
 
-	"mcp/internal/middleware"
-	"mcp/pkg/client"
-
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/rancher/rancher-ai-mcp/internal/middleware"
+	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"

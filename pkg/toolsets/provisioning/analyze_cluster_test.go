@@ -4,9 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"mcp/pkg/client"
-
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	provisioningV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/client-go/dynamic"

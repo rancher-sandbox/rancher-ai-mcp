@@ -6,8 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"mcp/pkg/converter"
-
+	"github.com/rancher/rancher-ai-mcp/pkg/converter"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"

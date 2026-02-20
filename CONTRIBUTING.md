@@ -60,7 +60,7 @@ To add a new tool to an existing toolset (e.g., adding a new tool to the `core` 
 package core
 
 import (
-    "mcp/pkg/response"
+    "github.com/rancher/rancher-ai-mcp/pkg/response"
     "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -133,7 +133,7 @@ type toolsAdder interface {
 package security
 
 import (
-    "mcp/pkg/client"
+    "github.com/rancher/rancher-ai-mcp/pkg/client"
     "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
