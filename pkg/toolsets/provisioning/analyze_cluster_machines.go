@@ -29,7 +29,7 @@ func (t *Tools) analyzeClusterMachines(ctx context.Context, toolReq *mcp.CallToo
 	})
 	log.Info("Analyzing Cluster Machines")
 
-	machines, machineSets, machineDeployments, err := t.getAllCAPIMachineResources(ctx, toolReq, log, getCAPIMachineResourcesParams{
+	machines, machineSets, machineDeployments, err := t.getAllCAPIMachineResources(ctx, log, getCAPIMachineResourcesParams{
 		namespace:     ns,
 		targetCluster: params.Cluster,
 	})
@@ -39,15 +39,15 @@ func (t *Tools) analyzeClusterMachines(ctx context.Context, toolReq *mcp.CallToo
 	}
 
 	var resources []*unstructured.Unstructured
-	if machines != nil && len(machines) > 0 {
+	if len(machines) > 0 {
 		resources = append(resources, machines...)
 	}
 
-	if machineSets != nil && len(machineSets) > 0 {
+	if len(machineSets) > 0 {
 		resources = append(resources, machineSets...)
 	}
 
-	if machineDeployments != nil && len(machineDeployments) > 0 {
+	if len(machineDeployments) > 0 {
 		resources = append(resources, machineDeployments...)
 	}
 

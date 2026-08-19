@@ -6,6 +6,8 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/rancher/rancher-ai-mcp/pkg/toolsets/core/projects"
+	"github.com/rancher/rancher-ai-mcp/pkg/toolsets/core/rbac"
+	"github.com/rancher/rancher-ai-mcp/pkg/utils"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -27,15 +29,17 @@ type toolsClient interface {
 
 // Tools contains all tools for the MCP server
 type Tools struct {
-	client   toolsClient
-	ReadOnly bool
+	client    toolsClient
+	paginator utils.Paginator
+	ReadOnly  bool
 }
 
 // NewTools creates and returns a new Tools instance.
 func NewTools(client toolsClient, readOnly bool) *Tools {
 	return &Tools{
-		client:   client,
-		ReadOnly: readOnly,
+		client:    client,
+		paginator: utils.NewResourcePaginator(),
+		ReadOnly:  readOnly,
 	}
 }
 
@@ -56,7 +60,9 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Returns a list of Kubernetes resources. The namespace must be empty for all namespaces or cluster-wide resources.`},
+		Description: `Returns a list of Kubernetes resources. The namespace must be empty for all namespaces or cluster-wide resources. Supports an optional JSONPath predicate to filter which resources are returned.
+
+Results are paginated with limit (page size, default 100) and offset (how many resources to skip from the start, default 0). To page through results, keep limit the same and increase offset by limit each time: offset=0 is the first page, offset=100 is the second page, offset=200 is the third page, and so on (with limit=100). When more resources remain, the response includes the exact offset value to pass in for the next page.`},
 		t.listKubernetesResources,
 	)
 
@@ -113,13 +119,23 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 
 	projects.NewTools(t.client, t.ReadOnly).AddTools(mcpServer)
 
+	rbac.NewTools(t.client, t.ReadOnly).AddTools(mcpServer)
+
 	if !t.ReadOnly {
 		mcp.AddTool(mcpServer, &mcp.Tool{
 			Name: "createKubernetesResource",
 			Meta: map[string]any{
 				toolsSetAnn: toolsSet,
 			},
-			Description: `Creates a resource in a Kubernetes cluster. The namespace must be empty for cluster-wide resources.`},
+			Description: `Creates a resource in a Kubernetes cluster from a complete Kubernetes manifest passed in the 'manifest' field, in YAML or JSON. The namespace must be empty for cluster-wide resources.
+
+Example of the manifest parameter (YAML):
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-cm
+data:
+  key: value`},
 			t.createKubernetesResource,
 		)
 
@@ -128,7 +144,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 			Meta: map[string]any{
 				toolsSetAnn: toolsSet,
 			},
-			Description: `Plans to create a resource in a Kubernetes cluster. It returns the JSON representation of the resource to be created without actually creating it in the cluster. Only used for displaying the resource when using human validation. The namespace must be empty for cluster-wide resources.`},
+			Description: `Plans to create a resource in a Kubernetes cluster from a complete Kubernetes manifest passed in the 'manifest' field, in YAML or JSON. It returns the JSON representation of the resource to be created without actually creating it in the cluster. Only used for displaying the resource when using human validation. The namespace must be empty for cluster-wide resources.`},
 			t.createKubernetesResourcePlan)
 
 		mcp.AddTool(mcpServer, &mcp.Tool{
@@ -136,10 +152,8 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 			Meta: map[string]any{
 				toolsSetAnn: toolsSet,
 			},
-			Description: `Patches a Kubernetes resource using a JSON patch. Don't ask for confirmation. The namespace must be empty for cluster-wide resources. The content type used is application/json-patch+json. Returns the modified resource.
-
-Example of the patch parameter:
-[{"op": "replace", "path": "/spec/replicas", "value": 3}]`},
+			InputSchema: patchResourceInputSchema(),
+			Description: `Patches a Kubernetes resource using a JSON patch. Don't ask for confirmation. The namespace must be empty for cluster-wide resources. The content type used is application/json-patch+json. Returns the modified resource.`},
 			t.updateKubernetesResource,
 		)
 
@@ -148,10 +162,8 @@ Example of the patch parameter:
 			Meta: map[string]any{
 				toolsSetAnn: toolsSet,
 			},
-			Description: `Plans to patch a Kubernetes resource using a JSON patch. It returns the JSON representation of the planned update without actually applying it in the cluster. Only used for displaying the patch when using human validation. The namespace must be empty for cluster-wide resources. The content type used is application/json-patch+json.
-
-Example of the patch parameter:
-[{"op": "replace", "path": "/spec/replicas", "value": 3}]`},
+			InputSchema: patchResourceInputSchema(),
+			Description: `Plans to patch a Kubernetes resource using a JSON patch. It returns the JSON representation of the planned update without actually applying it in the cluster. Only used for displaying the patch when using human validation. The namespace must be empty for cluster-wide resources. The content type used is application/json-patch+json. `},
 			t.updateKubernetesResourcePlan)
 	}
 }
