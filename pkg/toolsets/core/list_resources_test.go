@@ -467,6 +467,16 @@ func TestFilterByJSONPath(t *testing.T) {
 			expr:          `@.status.containerStatuses[?(@.restartCount>2 || @.state.waiting.reason=='CrashLoopBackOff')]`,
 			expectedNames: []string{"pod-high-restart", "pod-crashloop", "pod-both"},
 		},
+		"outer predicate OR - restartCount or CrashLoopBackOff": {
+			objs: []*unstructured.Unstructured{
+				newContainerStatusPod("pod-high-restart", int64(5), ""),
+				newContainerStatusPod("pod-crashloop", int64(0), "CrashLoopBackOff"),
+				newContainerStatusPod("pod-both", int64(3), "CrashLoopBackOff"),
+				newContainerStatusPod("pod-healthy", int64(1), ""),
+			},
+			expr:          `[?(@.status.containerStatuses[?(@.restartCount > 2)] || @.status.containerStatuses[*].state.waiting.reason == 'CrashLoopBackOff')]`,
+			expectedNames: []string{"pod-high-restart", "pod-crashloop", "pod-both"},
+		},
 		"logical AND matches intersection of two conditions": {
 			objs:          []*unstructured.Unstructured{running1, running2, pending},
 			expr:          `@.status.phase=="Running" && @.metadata.labels.app=="nginx"`,
