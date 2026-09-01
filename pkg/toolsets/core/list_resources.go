@@ -77,6 +77,11 @@ func (t *Tools) listKubernetesResources(ctx context.Context, toolReq *mcp.CallTo
 // expression. Both || (union) and && (intersection) are supported at any nesting
 // depth, including inside [?(...)] predicates, with && binding more tightly than ||.
 func filterByJSONPath(objs []*unstructured.Unstructured, expr string) ([]*unstructured.Unstructured, error) {
+	expr = strings.TrimSpace(expr)
+	if strings.HasPrefix(expr, "[?(") && findPredicateClose(expr, 3) == len(expr)-2 && expr[len(expr)-1] == ']' {
+		expr = strings.TrimSpace(expr[3 : len(expr)-2])
+	}
+
 	// || has the lowest precedence: split first and union branches.
 	if pos := findTopLevelOp(expr, "||"); pos >= 0 {
 		left, err := filterByJSONPath(objs, strings.TrimSpace(expr[:pos]))
@@ -196,7 +201,7 @@ func findNestedOpSplitWithOp(expr, op string) *opSplit {
 				depth--
 			default:
 				if depth > 0 && expr[i] == op[0] && i+1 < len(expr) && expr[i+1] == op[1] {
-					predicateOpen := findLastPredicateOpen(expr[:i])
+					predicateOpen := findEnclosingPredicateOpen(expr, i)
 					if predicateOpen < 0 {
 						continue
 					}
@@ -253,27 +258,29 @@ func intersectResults(a, b []*unstructured.Unstructured) []*unstructured.Unstruc
 	return result
 }
 
-// findLastPredicateOpen returns the start position of the last '[?(' in s.
-func findLastPredicateOpen(s string) int {
+// findEnclosingPredicateOpen returns the innermost '[?(' whose closing
+// parenthesis occurs after operatorPos.
+func findEnclosingPredicateOpen(expr string, operatorPos int) int {
 	pos, inDouble, inSingle := -1, false, false
-	for i := 0; i < len(s); i++ {
+	for i := 0; i < operatorPos; i++ {
 		switch {
 		case inDouble:
-			if s[i] == '"' {
+			if expr[i] == '"' {
 				inDouble = false
 			}
 		case inSingle:
-			if s[i] == '\'' {
+			if expr[i] == '\'' {
 				inSingle = false
 			}
 		default:
-			switch s[i] {
+			switch expr[i] {
 			case '"':
 				inDouble = true
 			case '\'':
 				inSingle = true
 			case '[':
-				if i+2 < len(s) && s[i+1] == '?' && s[i+2] == '(' {
+				if i+2 < len(expr) && expr[i+1] == '?' && expr[i+2] == '(' &&
+					findPredicateClose(expr, i+3) > operatorPos {
 					pos = i
 				}
 			}
