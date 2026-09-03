@@ -99,6 +99,18 @@ Results are paginated with limit (page size, default 100) and offset (how many r
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"clusters": map[string]any{
+					"type":        "array",
+					"description": "list of clusters to get images from. Empty to return images for all clusters",
+					"items": map[string]any{
+						"type": "string",
+					},
+				},
+			},
+		},
 		Description: `Returns all container images running across the specified clusters, along with the pods (name and namespace) using each image. Use in priority this tool to audit clusters for container registry or image usage, or to find which pods are running a specific container image. If clusters is empty, returns data for all clusters.`},
 		t.getClusterImages,
 	)

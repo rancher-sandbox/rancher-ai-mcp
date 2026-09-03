@@ -74,12 +74,7 @@ type updateKubernetesResourceParams struct {
 	Patch     jsonPatchList `json:"patch" jsonschema:"a JSON array of patch operation objects. Each element must be an object with 'op', 'path', and optionally 'value' fields, as defined in RFC 6902 (application/json-patch+json). Prefer a real JSON array; a stringified array is also accepted. Example: [{\"op\":\"replace\",\"path\":\"/spec/replicas\",\"value\":3}]"`
 }
 
-// patchResourceInputSchema builds the input schema for the patch tools. It is
-// derived from updateKubernetesResourceParams but relaxes the "patch" property
-// so schema validation accepts both a real JSON array and a stringified JSON
-// array, since some LLMs send the patch as a JSON string instead of an array.
-// The lenient jsonPatchList.UnmarshalJSON normalizes the string form after
-// validation passes.
+// patchResourceInputSchema builds the input schema for the patch tools.
 func patchResourceInputSchema() *jsonschema.Schema {
 	s, err := jsonschema.For[updateKubernetesResourceParams](nil)
 	if err != nil {
@@ -87,19 +82,10 @@ func patchResourceInputSchema() *jsonschema.Schema {
 	}
 
 	if patch, ok := s.Properties["patch"]; ok {
-		arraySchema := *patch
-		arraySchema.Description = ""
-		// jsonschema-go infers a slice as type ["null", "array"]. Some agent
-		// clients reject the multi-type form, so force a single "array" type.
-		arraySchema.Type = "array"
-		arraySchema.Types = nil
-		s.Properties["patch"] = &jsonschema.Schema{
-			Description: patch.Description,
-			AnyOf: []*jsonschema.Schema{
-				&arraySchema,
-				{Type: "string"},
-			},
-		}
+		// jsonschema-go infers a slice as type ["null", "array"]. Force a single "array" type
+		// so agent clients (like Gemini / Vertex AI) can validate function declarations.
+		patch.Type = "array"
+		patch.Types = nil
 	}
 
 	return s

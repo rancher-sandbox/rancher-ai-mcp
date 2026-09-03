@@ -72,6 +72,18 @@ This should be used when detailed information about a specific machine is requir
 		Meta: map[string]any{
 			toolsSetAnn: ToolsSet,
 		},
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"clusters": map[string]any{
+					"type":        "array",
+					"description": "list of clusters to get virtual clusters from. Empty to return virtual clusters for all clusters",
+					"items": map[string]any{
+						"type": "string",
+					},
+				},
+			},
+		},
 		Description: `List K3k virtual clusters deployed across downstream clusters.`},
 		t.getK3kClusters)
 
