@@ -64,15 +64,15 @@ func TestCreateK3kCluster(t *testing.T) {
 				Mode:          "virtual",
 				Servers:       3,
 				Agents:        3,
-				Sync: &SyncConfig{
+				Sync: SyncConfig{
 					PriorityClasses: true,
 					Ingresses:       true,
 				},
-				ServerLimit: &ResourceLimits{
+				ServerLimit: ResourceLimits{
 					CPU:    "2",
 					Memory: "4Gi",
 				},
-				Persistence: &PersistenceConfig{
+				Persistence: PersistenceConfig{
 					Type:             "dynamic",
 					StorageClassName: "longhorn",
 					StorageRequest:   "10Gi",

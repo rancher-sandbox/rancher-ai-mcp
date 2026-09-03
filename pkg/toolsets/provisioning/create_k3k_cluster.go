@@ -30,17 +30,17 @@ type SyncConfig struct {
 }
 
 type createK3kClusterParams struct {
-	Name          string             `json:"name" jsonschema:"the name of the K3k cluster"`
-	Namespace     string             `json:"namespace" jsonschema:"the namespace where the K3k cluster will be created"`
-	TargetCluster string             `json:"targetCluster" jsonschema:"the downstream cluster where the K3k resource will be applied"`
-	Version       string             `json:"version,omitempty" jsonschema:"the k3s/k8s version for the cluster (e.g., v1.33.1-k3s1). Defaults to host cluster version"`
-	Mode          string             `json:"mode,omitempty" jsonschema:"cluster mode (e.g., shared or virtual). Defaults to shared"`
-	Servers       int32              `json:"servers,omitempty" jsonschema:"number of server (control plane) nodes. Defaults to 1"`
-	Agents        int32              `json:"agents,omitempty" jsonschema:"number of agent (worker) nodes. Defaults to 0"`
-	Sync          *SyncConfig        `json:"sync,omitempty" jsonschema:"resource synchronization options with boolean flags for priorityClasses and ingresses. Shared mode only"`
-	ServerLimit   *ResourceLimits    `json:"serverLimit,omitempty" jsonschema:"resource constraints for server nodes (contains cpu and memory strings)"`
-	WorkerLimit   *ResourceLimits    `json:"workerLimit,omitempty" jsonschema:"resource constraints for worker nodes (contains cpu and memory strings)"`
-	Persistence   *PersistenceConfig `json:"persistence,omitempty" jsonschema:"storage settings for etcd data (contains type, storageClassName, storageRequest strings)"`
+	Name          string            `json:"name" jsonschema:"the name of the K3k cluster"`
+	Namespace     string            `json:"namespace" jsonschema:"the namespace where the K3k cluster will be created"`
+	TargetCluster string            `json:"targetCluster" jsonschema:"the downstream cluster where the K3k resource will be applied"`
+	Version       string            `json:"version,omitempty" jsonschema:"the k3s/k8s version for the cluster (e.g., v1.33.1-k3s1). Defaults to host cluster version"`
+	Mode          string            `json:"mode,omitempty" jsonschema:"cluster mode (e.g., shared or virtual). Defaults to shared"`
+	Servers       int32             `json:"servers,omitempty" jsonschema:"number of server (control plane) nodes. Defaults to 1"`
+	Agents        int32             `json:"agents,omitempty" jsonschema:"number of agent (worker) nodes. Defaults to 0"`
+	Sync          SyncConfig        `json:"sync,omitempty" jsonschema:"resource synchronization options with boolean flags for priorityClasses and ingresses. Shared mode only"`
+	ServerLimit   ResourceLimits    `json:"serverLimit,omitempty" jsonschema:"resource constraints for server nodes (contains cpu and memory strings)"`
+	WorkerLimit   ResourceLimits    `json:"workerLimit,omitempty" jsonschema:"resource constraints for worker nodes (contains cpu and memory strings)"`
+	Persistence   PersistenceConfig `json:"persistence,omitempty" jsonschema:"storage settings for etcd data (contains type, storageClassName, storageRequest strings)"`
 }
 
 // createK3kClusterObj builds the unstructured K3k Cluster object from the given parameters.
@@ -60,7 +60,7 @@ func (t *Tools) createK3kClusterObj(params createK3kClusterParams) *unstructured
 		spec["agents"] = int64(params.Agents)
 	}
 
-	if params.Sync != nil {
+	if params.Sync.Ingresses || params.Sync.PriorityClasses {
 		syncMap := map[string]interface{}{}
 		if params.Sync.Ingresses {
 			syncMap["ingresses"] = map[string]interface{}{
@@ -77,7 +77,7 @@ func (t *Tools) createK3kClusterObj(params createK3kClusterParams) *unstructured
 		}
 	}
 
-	if params.ServerLimit != nil {
+	if params.ServerLimit.CPU != "" || params.ServerLimit.Memory != "" {
 		lim := map[string]interface{}{}
 		if params.ServerLimit.CPU != "" {
 			lim["cpu"] = params.ServerLimit.CPU
@@ -90,7 +90,7 @@ func (t *Tools) createK3kClusterObj(params createK3kClusterParams) *unstructured
 		}
 	}
 
-	if params.WorkerLimit != nil {
+	if params.WorkerLimit.CPU != "" || params.WorkerLimit.Memory != "" {
 		lim := map[string]interface{}{}
 		if params.WorkerLimit.CPU != "" {
 			lim["cpu"] = params.WorkerLimit.CPU
@@ -103,7 +103,7 @@ func (t *Tools) createK3kClusterObj(params createK3kClusterParams) *unstructured
 		}
 	}
 
-	if params.Persistence != nil {
+	if params.Persistence.Type != "" || params.Persistence.StorageClassName != "" || params.Persistence.StorageRequest != "" {
 		p := map[string]interface{}{}
 		if params.Persistence.Type != "" {
 			p["type"] = params.Persistence.Type

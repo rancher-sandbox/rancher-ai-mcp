@@ -64,6 +64,10 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
+		InputSchema: map[string]any{
+			"type":       "object",
+			"properties": map[string]any{},
+		},
 		Description: `List all role templates in a Rancher cluster.
 		Role templates define a set of permissions that can be assigned to users or groups.`},
 		t.listRoleTemplates,
