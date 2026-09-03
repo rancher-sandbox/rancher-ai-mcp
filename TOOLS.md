@@ -50,11 +50,16 @@ Each tool is exposed through the MCP protocol and can be invoked by the Rancher 
 | `getUser` | Read-only | Get a user ID by username. |
 | `inspectPod` | Read-only | Returns all information related to a Pod. It includes its parent Deployment or StatefulSet, the CPU and memory consumption and the logs. It must be used for troubleshooting problems with pods. |
 | `listClusterRoleTemplateBindings` | Read-only | List all cluster role template bindings (CRTBs) in a Rancher cluster.<br>If a user ID is specified only returns CRTBs for that user.<br>CRTBs provide users permissions as specified by a RoleTemplate at the cluster level. |
-| `listClusters` | Read-only | Returns a list of all Rancher clusters, including local and downstream clusters. |
 | `listKubernetesResources` | Read-only | Returns a list of Kubernetes resources. The namespace must be empty for all namespaces or cluster-wide resources. Supports an optional JSONPath predicate to filter which resources are returned.<br><br>Results are paginated with limit (page size, default 100) and offset (how many resources to skip from the start, default 0). To page through results, keep limit the same and increase offset by limit each time: offset=0 is the first page, offset=100 is the second page, offset=200 is the third page, and so on (with limit=100). When more resources remain, the response includes the exact offset value to pass in for the next page. |
 | `listProjectRoleTemplateBindings` | Read-only | List all project role template bindings (PRTBs) in a Rancher cluster.<br>If a user ID is specified only returns PRTBs for that user.<br>If a project ID is specified only returns PRTBs for that project.<br>PRTBs provide users permissions as specified by a RoleTemplate in a project. |
 | `listProjects` | Read-only | Returns a list of project resources for a specified cluster. |
 | `listRoleTemplates` | Read-only | List all role templates in a Rancher cluster.<br>Role templates define a set of permissions that can be assigned to users or groups. |
 | `patchKubernetesResource` | Write | Patches a Kubernetes resource using a JSON patch. Don't ask for confirmation. The namespace must be empty for cluster-wide resources. The content type used is application/json-patch+json. Returns the modified resource. |
 | `patchKubernetesResourcePlan` | Write | Plans to patch a Kubernetes resource using a JSON patch. It returns the JSON representation of the planned update without actually applying it in the cluster. Only used for displaying the patch when using human validation. The namespace must be empty for cluster-wide resources. The content type used is application/json-patch+json. |
+
+## rancher,provisioning
+
+| Tool | Access | Description |
+|------|--------|-------------|
+| `listClusters` | Read-only | Returns a list of all Rancher clusters, including local and downstream clusters. |
 
